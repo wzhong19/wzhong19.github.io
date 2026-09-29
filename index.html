@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 视口设置：适配手机，禁止双击缩放干扰卡片点击 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#4f6ef7">
+<!-- iOS 添加主屏支持 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="单词闪卡">
+<meta name="description" content="初中英语单词闪卡（外研版九年级上册），艾宾浩斯间隔复习，离线可用">
+<title>初中英语单词闪卡 · 九年级上</title>
+<!-- PWA 清单与图标（若单独部署 index.html 而缺少这些文件，应用仍可正常运行） -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* ============================================================
+   样式：简洁明快，适合初中生；移动优先；浅色主题
+   ============================================================ */
+:root{
+  --primary:#4f6ef7;        /* 主色：靛蓝 */
+  --primary-dark:#3b55d9;
+  --primary-light:#eef1fe;
+  --bg:#f4f6fb;             /* 页面背景 */
+  --card:#ffffff;           /* 卡片背景 */
+  --text:#22293a;           /* 正文 */
+  --muted:#7a829a;          /* 次要文字 */
+  --green:#1fa05c;          /* 答对 */
+  --red:#e5484d;            /* 答错 */
+  --orange:#f59e0b;         /* 待复习 */
+  --line:#e7eaf3;
+  --radius:16px;
+  --shadow:0 2px 12px rgba(35,48,100,.08);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);font-size:16px;line-height:1.6;
+  max-width:640px;margin:0 auto;padding-bottom:76px; /* 给底部导航留空间 */
+  touch-action:manipulation; /* 去除移动端 300ms 点击延迟 */
+}
+h1,h2,h3{margin:.2em 0}
+button{font-family:inherit}
+
+/* ---------- 顶部 ---------- */
+header{
+  position:sticky;top:0;z-index:20;background:linear-gradient(135deg,#4f6ef7,#7a5cf0);
+  color:#fff;padding:14px 16px 12px;border-radius:0 0 18px 18px;
+}
+header .h-row{display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:19px;font-weight:700}
+header .date{font-size:12px;opacity:.85}
+header .count-chip{font-size:12px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 10px}
+
+/* ---------- 视图切换 ---------- */
+main{padding:14px 14px 10px}
+section.view{display:none;animation:fadeIn .25s ease}
+section.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- 底部导航 ---------- */
+#tabbar{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:640px;z-index:30;
+  display:flex;background:#fff;border-top:1px solid var(--line);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+#tabbar button{
+  flex:1;border:0;background:none;color:var(--muted);font-size:11px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;cursor:pointer;
+}
+#tabbar button .ico{font-size:20px;line-height:1}
+#tabbar button.active{color:var(--primary);font-weight:600}
+
+/* ---------- 通用组件 ---------- */
+.card-box{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:48px;padding:10px 18px;border:0;border-radius:14px;
+  font-size:16px;font-weight:600;cursor:pointer;transition:transform .06s,box-shadow .2s;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 4px 14px rgba(79,110,247,.35)}
+.btn-ghost{background:var(--primary-light);color:var(--primary)}
+.btn-good{background:#e6f6ee;color:var(--green);border:1.5px solid #bfe6d0}
+.btn-bad{background:#fdecec;color:var(--red);border:1.5px solid #f5c6c8}
+.btn-warn{background:#fff4e0;color:#c07f00;border:1.5px solid #f3dcae}
+.btn-block{width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.muted{color:var(--muted);font-size:13px}
+.tag{display:inline-block;font-size:11px;border-radius:99px;padding:1px 8px;margin-left:6px;vertical-align:middle}
+.tag-0{background:#f0f1f5;color:#8a90a3}
+.tag-1{background:#e8f0fe;color:#4f6ef7}
+.tag-2{background:#e0ecfd;color:#3b6fe0}
+.tag-3{background:#d5e8fd;color:#2c7fd6}
+.tag-4{background:#d8f3e5;color:#1fa05c}
+.tag-5{background:#c9f0da;color:#0d7a44}
+.tag-mistake{background:#fdecec;color:var(--red)}
+.tag-new{background:#fff4e0;color:#c07f00}
+
+/* ---------- 学习页：模式选择 ---------- */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.mode-item{
+  border:2px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px;
+  display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:left;
+}
+.mode-item .m-title{font-weight:700;font-size:14px}
+.mode-item .m-desc{font-size:11.5px;color:var(--muted)}
+.mode-item.sel{border-color:var(--primary);background:var(--primary-light)}
+.mode-item.sel .m-title{color:var(--primary)}
+
+/* 今日计划概览 */
+.plan-row{display:flex;gap:10px;margin:10px 0}
+.plan-item{flex:1;background:#fff;border-radius:12px;padding:10px;text-align:center;border:1.5px solid var(--line)}
+.plan-item b{font-size:22px;display:block}
+.plan-item span{font-size:12px;color:var(--muted)}
+.plan-item.p-new b{color:var(--primary)}
+.plan-item.p-due b{color:var(--orange)}
+
+/* ---------- 闪卡（翻转） ---------- */
+.session-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.session-top .prog{font-size:13px;color:var(--muted)}
+.session-top .quit{border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer;padding:6px}
+.pbar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:14px}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,#4f6ef7,#7a5cf0);border-radius:99px;transition:width .3s}
+
+.flip{perspective:1200px;cursor:pointer;margin-bottom:14px}
+.flip-inner{position:relative;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
+.flip.flipped .flip-inner{transform:rotateY(180deg)}
+.face{
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+  min-height:280px;padding:22px 18px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+}
+.face.back{position:absolute;inset:0;transform:rotateY(180deg);justify-content:flex-start;overflow-y:auto;text-align:left;align-items:stretch}
+.face .word{font-size:38px;font-weight:800;letter-spacing:.5px;word-break:break-word}
+.face .phon{color:var(--muted);font-size:17px;margin-top:6px}
+.face .pos-m{font-size:20px;font-weight:700;margin-top:8px}
+.face .pos{color:var(--primary);font-size:14px;margin-right:6px}
+.face .forms{background:#f6f8fd;border-radius:10px;padding:8px 12px;font-size:13.5px;color:#4a5372;margin-top:12px}
+.face .ex{margin-top:14px;font-size:15.5px;font-style:italic;line-height:1.55}
+.face .ex b{color:var(--primary);font-style:normal}
+.face .ext{margin-top:4px;font-size:13px;color:var(--muted)}
+.face .tap-hint{position:absolute;bottom:12px;left:0;right:0;font-size:12px;color:#b3b9cc}
+.speak-btn{
+  margin-top:12px;border:0;background:var(--primary-light);color:var(--primary);
+  border-radius:99px;padding:7px 16px;font-size:14px;cursor:pointer;
+}
+.level-dots{display:flex;gap:5px;margin-top:14px}
+.level-dots i{width:9px;height:9px;border-radius:50%;background:#dfe3ee}
+.level-dots i.on{background:var(--green)}
+
+/* ---------- 判分按钮 ---------- */
+.judge{display:flex;gap:12px}
+.judge .btn{flex:1;font-size:17px}
+
+/* ---------- 拼写/选词填空 ---------- */
+.quiz-card{
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:22px 18px;min-height:280px;display:flex;flex-direction:column;justify-content:center;margin-bottom:14px;
+}
+.q-label{font-size:12px;color:var(--primary);font-weight:700;letter-spacing:1px;margin-bottom:10px}
+.q-meaning{font-size:24px;font-weight:700;line-height:1.45}
+.q-pos{color:var(--primary);font-size:15px;margin-right:6px}
+#spellInput{
+  width:100%;font-size:22px;padding:12px 14px;margin-top:18px;
+  border:2px solid var(--line);border-radius:12px;outline:none;text-align:center;
+}
+#spellInput:focus{border-color:var(--primary)}
+.hint-btn{margin-top:12px;border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline}
+.hint-text{margin-top:8px;font-size:14px;color:var(--orange);min-height:20px}
+.feedback{margin-top:14px;font-size:16px;font-weight:700;border-radius:10px;padding:10px 12px;display:none}
+.feedback.ok{display:block;background:#e6f6ee;color:var(--green)}
+.feedback.no{display:block;background:#fdecec;color:var(--red)}
+.cloze-sent{font-size:19px;line-height:1.7;font-style:italic}
+.cloze-sent b{color:var(--primary);font-style:normal}
+.blank{display:inline-block;min-width:90px;border-bottom:2px solid var(--primary);color:var(--primary);font-weight:700;font-style:normal;text-align:center}
+.cloze-trans{margin-top:10px;font-size:13.5px;color:var(--muted)}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.options button{
+  min-height:52px;border:2px solid var(--line);background:#fff;border-radius:12px;
+  font-size:16.5px;font-weight:600;color:var(--text);cursor:pointer;word-break:break-word;
+}
+.options button.right{border-color:var(--green);background:#e6f6ee;color:var(--green)}
+.options button.wrong{border-color:var(--red);background:#fdecec;color:var(--red)}
+.options button:disabled{cursor:default;opacity:.9}
+
+/* ---------- 完成页 ---------- */
+.done-face{text-align:center;padding:30px 16px}
+.done-face .big{font-size:52px}
+.done-face .nums{display:flex;justify-content:center;gap:26px;margin:16px 0}
+.done-face .nums b{font-size:26px;display:block}
+.done-face .nums .g{color:var(--green)} .done-face .nums .r{color:var(--red)}
+
+/* ---------- 统计仪表盘 ---------- */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px;text-align:center}
+.stat-card b{font-size:26px;display:block;line-height:1.2}
+.stat-card span{font-size:12.5px;color:var(--muted)}
+.sc-blue b{color:var(--primary)} .sc-green b{color:var(--green)}
+.sc-orange b{color:var(--orange)} .sc-gray b{color:#8a90a3}
+.mod-prog{margin-bottom:10px}
+.mod-prog .mp-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+.mod-prog .mp-bar{height:7px;background:var(--line);border-radius:99px;overflow:hidden}
+.mod-prog .mp-bar i{display:block;height:100%;background:linear-gradient(90deg,#4f6ef7,#7a5cf0)}
+
+/* ---------- 词库 ---------- */
+.search-box{
+  width:100%;padding:11px 14px;border:2px solid var(--line);border-radius:12px;
+  outline:none;font-size:15px;margin-bottom:12px;background:#fff;
+}
+.search-box:focus{border-color:var(--primary)}
+.mod-item{background:var(--card);border-radius:14px;box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden}
+.mod-head{display:flex;align-items:center;padding:12px 14px;cursor:pointer;gap:8px}
+.mod-head .mt{flex:1;font-weight:700;font-size:14.5px}
+.mod-head .mc{font-size:12px;color:var(--muted);white-space:nowrap}
+.mod-toggle{
+  border:1.5px solid var(--line);background:#fff;color:var(--muted);border-radius:99px;
+  font-size:11px;padding:3px 9px;cursor:pointer;white-space:nowrap;
+}
+.mod-toggle.on{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.mod-words{display:none;border-top:1px solid var(--line);padding:6px 14px 10px}
+.mod-item.open .mod-words{display:block}
+.word-row{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px dashed #eef0f6;font-size:14px}
+.word-row:last-child{border-bottom:0}
+.word-row .en{font-weight:700;min-width:88px}
+.word-row .ph{color:var(--muted);font-size:12px;flex:1}
+.word-row .cn{flex:2;color:#3a4157}
+
+/* ---------- 错题本 ---------- */
+.mistake-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px dashed #eef0f6}
+.mistake-row .mi-w{font-weight:800;font-size:16px}
+.mistake-row .mi-m{flex:1;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mistake-row .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:6px}
+
+/* ---------- 设置 ---------- */
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px dashed #eef0f6}
+.set-row:last-child{border-bottom:0}
+.set-row label{font-weight:600;font-size:14.5px}
+.set-row input[type=number]{width:76px;padding:8px;border:2px solid var(--line);border-radius:10px;font-size:16px;text-align:center}
+textarea#importArea{
+  width:100%;height:130px;border:2px solid var(--line);border-radius:12px;padding:10px;
+  font-size:13px;outline:none;resize:vertical;font-family:inherit;
+}
+textarea#importArea:focus{border-color:var(--primary)}
+.fmt-tip{font-size:12px;color:var(--muted);background:#f6f8fd;border-radius:10px;padding:8px 12px;margin:8px 0;line-height:1.7}
+.fmt-tip code{background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:11.5px;color:var(--primary-dark)}
+
+/* ---------- 提示气泡 ---------- */
+#toast{
+  position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);
+  background:rgba(30,36,54,.92);color:#fff;padding:10px 20px;border-radius:99px;
+  font-size:14px;opacity:0;pointer-events:none;transition:all .3s;z-index:99;max-width:86%;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* 桌面端微调 */
+@media (min-width:560px){
+  .face .word{font-size:46px}
+  #tabbar{border-radius:18px 18px 0 0}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶部标题栏 ================= -->
+<header>
+  <div class="h-row">
+    <div>
+      <h1>📘 初中英语单词闪卡</h1>
+      <div class="date">2026新版外研版 · 九年级上册 · 离线可用</div>
+    </div>
+    <div class="count-chip" id="headerChip">今日 0 词</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= 视图1：学习 ================= -->
+  <section class="view active" id="view-study">
+    <!-- 学习准备面板（会话开始前显示） -->
+    <div id="studySetup">
+      <div class="card-box">
+        <h3>🗓️ 今日计划</h3>
+        <div class="plan-row">
+          <div class="plan-item p-new"><b id="planNew">0</b><span>今日新词</span></div>
+          <div class="plan-item p-due"><b id="planDue">0</b><span>待复习</span></div>
+        </div>
+        <div class="muted" id="planTip"></div>
+      </div>
+
+      <div class="card-box">
+        <h3>🎯 选择练习模式</h3>
+        <div class="mode-grid" id="modeGrid">
+          <button class="mode-item sel" data-mode="en2cn">
+            <span class="m-title">🔠 英译汉</span><span class="m-desc">看英文想中文，翻转卡片自测</span>
+          </button>
+          <button class="mode-item" data-mode="cn2en">
+            <span class="m-title">🇨🇳 汉译英</span><span class="m-desc">看中文回忆英文拼写</span>
+          </button>
+          <button class="mode-item" data-mode="spell">
+            <span class="m-title">✏️ 拼写默写</span><span class="m-desc">输入英文，自动判分</span>
+          </button>
+          <button class="mode-item" data-mode="cloze">
+            <span class="m-title">🧩 选词填空</span><span class="m-desc">真题例句挖空，四选一</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="btnStartPlan">🚀 开始今日学习</button>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-ghost btn-block" id="btnOnlyNew">只学新词</button>
+        <button class="btn btn-ghost btn-block" id="btnOnlyDue">只复习</button>
+      </div>
+    </div>
+
+    <!-- 练习进行面板（会话中显示，内容由 JS 动态渲染） -->
+    <div id="studySession" style="display:none"></div>
+  </section>
+
+  <!-- ================= 视图2：词库 ================= -->
+  <section class="view" id="view-bank">
+    <input class="search-box" id="bankSearch" placeholder="🔍 搜索单词或释义…">
+    <div class="muted" style="margin-bottom:8px">点击模块展开单词 · 「参与学习」开关控制该模块是否进入学习计划</div>
+    <div id="bankList"></div>
+  </section>
+
+  <!-- ================= 视图3：统计仪表盘 ================= -->
+  <section class="view" id="view-stats">
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="card-box">
+      <h3>📊 模块进度</h3>
+      <div class="mod-prog" id="modProg"></div>
+    </div>
+    <div class="card-box">
+      <h3>🛠️ 学习记录</h3>
+      <p class="muted">重置将清空所有单词的记忆等级、复习计划与错题记录（词库不受影响），操作不可撤销。</p>
+      <button class="btn btn-bad btn-block" id="btnReset">🗑️ 重置学习记录</button>
+    </div>
+  </section>
+
+  <!-- ================= 视图4：错题本 ================= -->
+  <section class="view" id="view-mistakes">
+    <div class="card-box" id="mistakeCard">
+      <h3>❌ 错题本</h3>
+      <p class="muted">答错过的单词会自动收进错题本，答对一次即自动移出。</p>
+      <div class="mode-grid" id="mistakeModeGrid">
+        <button class="mode-item sel" data-mode="en2cn"><span class="m-title">🔠 英译汉</span></button>
+        <button class="mode-item" data-mode="cn2en"><span class="m-title">🇨🇳 汉译英</span></button>
+        <button class="mode-item" data-mode="spell"><span class="m-title">✏️ 默写</span></button>
+        <button class="mode-item" data-mode="cloze"><span class="m-title">🧩 填空</span></button>
+      </div>
+      <button class="btn btn-primary btn-block" id="btnMistakeReview">开始错题复习</button>
+      <div id="mistakeList" style="margin-top:10px"></div>
+      <button class="btn btn-warn btn-block" id="btnClearMistakes" style="display:none;margin-top:10px">清空错题本</button>
+    </div>
+  </section>
+
+  <!-- ================= 视图5：设置 ================= -->
+  <section class="view" id="view-settings">
+    <div class="card-box">
+      <h3>⚙️ 学习设置</h3>
+      <div class="set-row">
+        <label for="dailyNew">每日新词数量</label>
+        <input type="number" id="dailyNew" min="5" max="50" step="5">
+      </div>
+      <div class="set-row">
+        <label>添加到手机/电脑桌面</label>
+        <button class="btn btn-ghost" id="btnInstall" style="display:none;min-height:40px;padding:6px 14px">📲 一键添加</button>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3>📥 自定义导入单词</h3>
+      <p class="muted">粘贴单词到下方文本框，每行一个，字段用竖线 <code>|</code> 分隔：</p>
+      <div class="fmt-tip">
+        完整格式：<code>单词|音标|词性|释义|词形变化|例句|例句翻译</code><br>
+        简写①：<code>单词|音标|释义</code>　简写②：<code>单词|释义</code><br>
+        示例：<code>achieve|əˈtʃiːv|v.|实现；达到|三单 achieves；过去式 achieved|You can achieve your dream by working hard.|通过努力你能实现梦想。</code>
+      </div>
+      <textarea id="importArea" placeholder="在此粘贴单词，每行一个…"></textarea>
+      <button class="btn btn-primary btn-block" id="btnImport" style="margin-top:10px">导入到「我的词库」</button>
+      <div class="set-row" style="margin-top:6px">
+        <label>我的词库 <span class="muted" id="customCount"></span></label>
+        <button class="btn btn-bad" id="btnClearCustom" style="min-height:40px;padding:6px 14px">清空</button>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3>💾 数据备份</h3>
+      <p class="muted">学习进度保存在本机浏览器（localStorage），换设备或清浏览器缓存前建议先备份。</p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-block" id="btnExport">导出备份</button>
+        <button class="btn btn-ghost btn-block" id="btnRestore">导入备份</button>
+      </div>
+      <input type="file" id="restoreFile" accept=".json" style="display:none">
+    </div>
+
+    <div class="card-box">
+      <h3>ℹ️ 关于</h3>
+      <p class="muted" style="margin:0">
+        内置词库为2026新版外研版九年级上册 6 个单元的词汇与短语（每单元约40条，含词形变化与例句）。复习间隔遵循艾宾浩斯遗忘曲线（1/2/4/7/15 天）。
+        纯前端离线应用，无广告、不上传任何数据。<br>📲 添加到桌面：安卓 Chrome 菜单 →「添加到主屏幕」；iOS Safari 分享 →「添加到主屏幕」。
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= 底部导航 ================= -->
+<nav id="tabbar">
+  <button data-view="study" class="active"><span class="ico">📖</span>学习</button>
+  <button data-view="bank"><span class="ico">📚</span>词库</button>
+  <button data-view="stats"><span class="ico">📊</span>统计</button>
+  <button data-view="mistakes"><span class="ico">❌</span>错题本</button>
+  <button data-view="settings"><span class="ico">⚙️</span>设置</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+ * 初中英语单词闪卡（外研版九年级上）· 纯前端离线 PWA
+ * 模块：①内置词库 ②存储层 ③艾宾浩斯SRS引擎 ④练习会话 ⑤各视图渲染
+ *       ⑥自定义导入/备份 ⑦PWA注册
+ * ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+ * ① 内置词库（外研版九年级上册，按 Module 分组）
+ *    字段：w=英文 p=音标 pos=词性 m=释义 f=词形变化 e=例句 t=例句翻译
+ * ------------------------------------------------------------------------- */
+const BANK=[
+/* ================= 2026 新版外研版九年级上册 · 6 个单元 ================= */
+{id:"u1",title:"Unit 1 Teenagers today",words:[
+{w:"lady",p:"ˈleɪdi",pos:"n.",m:"女士，女子",f:"复数 ladies；对应 gentleman",e:"A young lady is teaching the children how to make paper puppets.",t:"一位年轻女士正在教孩子们制作纸木偶。"},
+{w:"gentleman",p:"ˈdʒentlmən",pos:"n.",m:"先生",f:"复数 gentlemen；对应 lady",e:"The gentleman gave his seat to an old lady on the bus.",t:"公共汽车上那位先生把座位让给了一位老太太。"},
+{w:"puppet",p:"ˈpʌpɪt",pos:"n.",m:"（牵线）木偶；手偶",f:"复数 puppets；派生 puppetry n. 木偶表演艺术",e:"The children used puppets to tell an old folk story.",t:"孩子们用木偶表演讲述一个古老的民间故事。"},
+{w:"puppetry",p:"ˈpʌpɪtri",pos:"n.",m:"木偶表演艺术",f:"不可数名词；派生 puppet n. 木偶",e:"Chinese puppetry has a history of more than 2,000 years.",t:"中国木偶艺术已有两千多年的历史。"},
+{w:"performer",p:"pəˈfɔːmə(r)",pos:"n.",m:"表演者",f:"复数 performers；派生 perform v. 表演",e:"The performers made the puppets dance to the music.",t:"表演者们让木偶随着音乐起舞。"},
+{w:"perform",p:"pəˈfɔːm",pos:"v.",m:"表演，演出",f:"三单 performs；过去式 performed；派生 performance n. 表演",e:"The students will perform a play about teenagers' life.",t:"学生们将表演一部关于青少年生活的戏剧。"},
+{w:"performance",p:"pəˈfɔːməns",pos:"n.",m:"表演；演出",f:"复数 performances；派生 perform v. 表演",e:"Their performance won first prize at the school art festival.",t:"他们的表演在学校艺术节上获得了一等奖。"},
+{w:"finger",p:"ˈfɪŋɡə(r)",pos:"n.",m:"手指",f:"复数 fingers",e:"The performer moves the puppet's arms with his fingers.",t:"表演者用手指操纵木偶的手臂。"},
+{w:"teenager",p:"ˈtiːneɪdʒə(r)",pos:"n.",m:"青少年",f:"复数 teenagers；派生 teenage adj. 青少年的",e:"Most teenagers like to share their hobbies online.",t:"大多数青少年喜欢在网上分享自己的爱好。"},
+{w:"teenage",p:"ˈtiːneɪdʒ",pos:"adj.",m:"青少年的",f:"常作定语；派生 teenager n. 青少年",e:"The book tells stories about teenage life in China.",t:"这本书讲述了中国青少年的生活故事。"},
+{w:"old-fashioned",p:"ˌəʊldˈfæʃnd",pos:"adj.",m:"老式的，过时的",f:"比较级 more old-fashioned；反义 fashionable 时尚的",e:"My grandpa thinks mobile games are old-fashioned, but I love them.",t:"我爷爷认为手机游戏老掉牙了，但我很喜欢。"},
+{w:"blood",p:"blʌd",pos:"n.",m:"血，血液",f:"不可数名词；派生 bloody adj. 血腥的",e:"When I cut my finger, a little blood came out.",t:"我割破手指时，流出了一点血。"},
+{w:"lost",p:"lɒst",pos:"adj.",m:"全神贯注的",f:"be lost in 全神贯注于；lose 的过去式也是 lost",e:"He was lost in the puppet show and forgot the time.",t:"他看得入了迷，忘了时间。"},
+{w:"viewer",p:"ˈvjuːə(r)",pos:"n.",m:"观众",f:"复数 viewers；派生 view v./n. 观看；观点",e:"Millions of viewers watched the video about folk arts.",t:"数百万观众观看了这个关于民间艺术的视频。"},
+{w:"volunteer",p:"ˌvɒlənˈtɪə(r)",pos:"n.",m:"志愿者",f:"复数 volunteers；也可作动词（自愿做）",e:"The volunteers teach children folk arts every weekend.",t:"志愿者们每个周末教孩子们民间艺术。"},
+{w:"excerpt",p:"ˈeksɜːpt",pos:"n.",m:"（书籍的）摘录，节录",f:"复数 excerpts",e:"Our teacher read an excerpt from a famous novel to us.",t:"老师给我们朗读了一部名著的节选。"},
+{w:"amaze",p:"əˈmeɪz",pos:"v.",m:"使大为惊奇",f:"三单 amazes；过去式 amazed；派生 amazing adj. 令人惊奇的",e:"The puppet show amazed everyone in the theatre.",t:"木偶表演让剧场里的每个人都惊叹不已。"},
+{w:"surprising",p:"səˈpraɪzɪŋ",pos:"adj.",m:"令人惊奇的",f:"派生 surprise v./n. 使惊奇；惊奇；surprised adj. 感到惊讶的",e:"It is surprising that the performer is only twelve years old.",t:"令人惊讶的是，表演者只有十二岁。"},
+{w:"abroad",p:"əˈbrɔːd",pos:"adv.",m:"在国外",f:"短语 go abroad 出国；at home and abroad 在国内外",e:"Her video about Chinese puppetry is popular both at home and abroad.",t:"她拍摄的中国木偶戏视频在国内外都很受欢迎。"},
+{w:"programme",p:"ˈprəʊɡræm",pos:"n.",m:"计划，方案",f:"复数 programmes；美式拼法 program",e:"The school started a programme to teach students traditional arts.",t:"学校启动了一个教学生传统艺术的项目。"},
+{w:"video",p:"ˈvɪdiəʊ",pos:"n.",m:"视频",f:"复数 videos",e:"She posted a video about shadow puppetry online.",t:"她在网上发布了一个关于皮影戏的视频。"},
+{w:"report",p:"rɪˈpɔːt",pos:"n./v.",m:"报道；报告",f:"三单 reports；过去式 reported；派生 reporter n. 记者",e:"The students will report the news of the art festival.",t:"学生们将报道艺术节的消息。"},
+{w:"post",p:"pəʊst",pos:"v.",m:"发布（帖子）",f:"三单 posts；过去式 posted",e:"He posted a photo of his painting on the school website.",t:"他在学校网站上发布了一张自己画作的照片。"},
+{w:"fence",p:"fens",pos:"n.",m:"栅栏，篱笆",f:"复数 fences",e:"They painted a scarecrow on the garden fence.",t:"他们在花园的栅栏上画了一个稻草人。"},
+{w:"scarecrow",p:"ˈskeəkrəʊ",pos:"n.",m:"稻草人",f:"复数 scarecrows",e:"The farmer put a scarecrow in the field to keep birds away.",t:"农民在地里立了一个稻草人来驱赶鸟儿。"},
+{w:"kill",p:"kɪl",pos:"v.",m:"弄死，杀死",f:"三单 kills；过去式 killed；现在分词 killing",e:"Farmers use scarecrows to keep birds away instead of killing them.",t:"农民用稻草人驱赶鸟儿，而不是杀死它们。"},
+{w:"educator",p:"ˈedjʊkeɪtə(r)",pos:"n.",m:"教育家",f:"复数 educators；派生 educate v. 教育；education n. 教育",e:"The educator believes that art can change teenagers' lives.",t:"这位教育家相信艺术能改变青少年的生活。"},
+{w:"attention",p:"əˈtenʃn",pos:"n.",m:"注意",f:"不可数名词；短语 pay attention to 注意",e:"Please pay attention to the teacher's instructions.",t:"请注意听老师的讲解。"},
+{w:"nation",p:"ˈneɪʃn",pos:"n.",m:"国家",f:"复数 nations；派生 national adj. 国家的",e:"The whole nation is proud of the young performers.",t:"全国人民都为年轻表演者们感到骄傲。"},
+{w:"energy",p:"ˈenədʒi",pos:"n.",m:"力量，活力",f:"不可数名词；复数 energies 精力",e:"The young volunteers are full of energy.",t:"年轻的志愿者们充满活力。"},
+{w:"youth",p:"juːθ",pos:"n.",m:"青年，年轻人",f:"复数 youths；集合用法 the youth 青年们",e:"The youth of today have many ways to show their talents.",t:"如今的年轻人有很多展示才华的途径。"},
+{w:"wealthy",p:"ˈwelθi",pos:"adj.",m:"富有的",f:"比较级 wealthier；派生 wealth n. 财富",e:"The wealthy businessman donated money to the art school.",t:"那位富有的商人向艺术学校捐了款。"},
+{w:"independent",p:"ˌɪndɪˈpendənt",pos:"adj.",m:"独立的",f:"派生 independence n. 独立；反义 dependent 依赖的",e:"Teenagers should learn to be independent of their parents.",t:"青少年应该学会独立，不依赖父母。"},
+{w:"unless",p:"ʌnˈles",pos:"conj.",m:"除非",f:"常引导条件状语从句",e:"You will miss the puppet show unless you hurry up.",t:"除非你快点，否则会错过木偶表演。"},
+{w:"edge",p:"edʒ",pos:"n.",m:"边缘",f:"复数 edges；短语 on the edge of 在……边缘",e:"We sat on the edge of our seats, watching the exciting show.",t:"我们坐在座位边缘，紧张地观看这场激动人心的演出。"},
+{w:"creator",p:"kriˈeɪtə(r)",pos:"n.",m:"创作者",f:"复数 creators；派生 create v. 创造",e:"The creator of the video is a teenage student.",t:"这个视频的创作者是一名青少年学生。"},
+{w:"artist",p:"ˈɑːtɪst",pos:"n.",m:"艺术家",f:"复数 artists；派生 art n. 艺术",e:"The folk artist can make a puppet in just one day.",t:"这位民间艺人一天之内就能做出一个木偶。"},
+{w:"group",p:"ɡruːp",pos:"n.",m:"组，群；团体",f:"复数 groups；短语 a group of 一群",e:"A group of teenagers visited the puppet theatre.",t:"一群青少年参观了木偶剧院。"},
+{w:"folk arts",p:"",pos:"phr.",m:"民间艺术",f:"folk 作定语，意为“民间的”",e:"Folk arts like paper-cutting are popular among young people.",t:"剪纸等民间艺术很受年轻人欢迎。"},
+{w:"take part in",p:"",pos:"phr.",m:"参加",f:"近义 join in；后接名词或动名词",e:"More and more students take part in after-school art activities.",t:"越来越多的学生参加课外艺术活动。"},
+{w:"be flooded with",p:"",pos:"phr.",m:"大量收到",f:"flood 本义“淹没”，此处为比喻用法",e:"You will be flooded with messages if your video becomes popular.",t:"如果你的视频火了，你就会收到大量留言。"},
+{w:"hold on",p:"",pos:"phr.",m:"坚持",f:"也可用于电话用语“别挂断”",e:"Hold on to your dream, and you will make it one day.",t:"坚持你的梦想，总有一天你会实现它。"},
+{w:"shoulder the responsibility",p:"",pos:"phr.",m:"承担责任",f:"shoulder 此处作动词，意为“承担”",e:"Teenagers should shoulder the responsibility of protecting folk arts.",t:"青少年应该承担起保护民间艺术的责任。"},
+{w:"on the edge of one's seat",p:"",pos:"phr.",m:"紧张入迷",f:"习惯用语，形容十分专注或兴奋",e:"The puppet show was so exciting that we were on the edge of our seats.",t:"木偶表演太精彩了，我们看得目不转睛。"}
+]},
+{id:"u2",title:"Unit 2 On the money",words:[
+{w:"comb",p:"kəʊm",pos:"n.",m:"梳子",f:"复数 combs；注意 b 不发音",e:"The comb costs only five yuan.",t:"这把梳子只要五元钱。"},
+{w:"tin",p:"tɪn",pos:"n.",m:"金属盒；罐头",f:"复数 tins；a tin of 一罐……",e:"Grandma keeps her coins in an old tin box.",t:"奶奶把硬币放在一个旧铁盒里。"},
+{w:"certainly",p:"ˈsɜːtnli",pos:"adv.",m:"当然",f:"派生 certain adj. 确定的",e:"Can I borrow your moneybox? Certainly!",t:"我能借你的储钱罐用用吗？当然可以！"},
+{w:"chain",p:"tʃeɪn",pos:"n.",m:"链子，链条",f:"复数 chains",e:"She wears a silver chain around her neck.",t:"她脖子上戴着一条银链子。"},
+{w:"save",p:"seɪv",pos:"v.",m:"储蓄；节约",f:"三单 saves；过去式 saved；短语 save up 存钱",e:"He saves part of his pocket money every month.",t:"他每个月都会把零花钱存起来一部分。"},
+{w:"spare",p:"speə(r)",pos:"adj.",m:"备用的；多余的",f:"短语 spare time 空余时间",e:"I keep a spare key in my schoolbag.",t:"我在书包里放了一把备用钥匙。"},
+{w:"moneybox",p:"ˈmʌnibɒks",pos:"n.",m:"储钱盒，存钱罐",f:"复数 moneyboxes",e:"There are many coins in my moneybox.",t:"我的储钱罐里有很多硬币。"},
+{w:"own",p:"əʊn",pos:"adj./v.",m:"自己的；拥有",f:"三单 owns；过去式 owned；派生 owner n. 主人",e:"She owns a small shop that sells handmade gifts.",t:"她开了一家卖手工礼物的小店。"},
+{w:"size",p:"saɪz",pos:"n.",m:"大小，尺寸",f:"复数 sizes；短语 the size of ……的大小",e:"This moneybox is twice the size of that one.",t:"这个储钱罐是那个的两倍大。"},
+{w:"manage",p:"ˈmænɪdʒ",pos:"v.",m:"成功应付；管理",f:"三单 manages；过去式 managed；派生 manager n. 经理",e:"With a good budget, you can manage your pocket money wisely.",t:"有了好的预算，你就能明智地打理零花钱。"},
+{w:"key",p:"kiː",pos:"n.",m:"关键；钥匙",f:"复数 keys；短语 the key to ……的关键",e:"Planning is the key to saving money.",t:"计划是存钱的关键。"},
+{w:"deal",p:"diːl",pos:"v.",m:"处理，应付",f:"三单 deals；过去式 dealt；短语 deal with 处理",e:"Learning to deal with money is an important life skill.",t:"学会打理钱财是一项重要的生活技能。"},
+{w:"laptop",p:"ˈlæptɒp",pos:"n.",m:"笔记本电脑",f:"复数 laptops",e:"The laptop is on sale at half price this week.",t:"这台笔记本电脑本周半价出售。"},
+{w:"budget",p:"ˈbʌdʒɪt",pos:"n.",m:"预算",f:"复数 budgets；短语 on a budget 节省费用",e:"Mum makes a budget before every big shopping trip.",t:"每次大采购前，妈妈都会做预算。"},
+{w:"exactly",p:"ɪɡˈzæktli",pos:"adv.",m:"正是，不错",f:"派生 exact adj. 确切的",e:"That's exactly what I wanted to say about saving money.",t:"关于存钱，那正是我想说的话。"},
+{w:"pleasure",p:"ˈpleʒə(r)",pos:"n.",m:"愉快，快乐",f:"不可数名词；短语 with pleasure 乐意地",e:"It's a pleasure to help you count the coins.",t:"很高兴帮你数硬币。"},
+{w:"end",p:"end",pos:"n./v.",m:"末尾；结束",f:"复数 ends；过去式 ended；短语 make ends meet 勉强维持",e:"The month ends with a big sale in the shop.",t:"这个月以商店的大促销收尾。"},
+{w:"bank",p:"bæŋk",pos:"n.",m:"银行；河岸",f:"复数 banks",e:"My father keeps his savings in a bank.",t:"我爸爸把积蓄存在银行里。"},
+{w:"account",p:"əˈkaʊnt",pos:"n.",m:"账户",f:"复数 accounts；短语 bank account 银行账户",e:"I opened a savings account with my pocket money.",t:"我用零花钱开了一个储蓄账户。"},
+{w:"expensive",p:"ɪkˈspensɪv",pos:"adj.",m:"昂贵的",f:"反义 cheap 便宜的；派生 expense n. 费用",e:"The laptop is too expensive for me to buy.",t:"这台笔记本电脑太贵了，我买不起。"},
+{w:"price",p:"praɪs",pos:"n.",m:"价格",f:"复数 prices",e:"The price of the video game is 30 dollars.",t:"这个电子游戏的价格是30美元。"},
+{w:"savings",p:"ˈseɪvɪŋz",pos:"n.",m:"积蓄；存款",f:"常用复数；派生 save v. 储蓄",e:"She used her savings to buy a gift for Mum.",t:"她用积蓄给妈妈买了份礼物。"},
+{w:"date",p:"deɪt",pos:"n.",m:"日期；约会",f:"复数 dates；短语 out of date 过时的",e:"What's the date today? It's 24 December, Christmas Eve.",t:"今天几号？今天是12月24日，平安夜。"},
+{w:"sale",p:"seɪl",pos:"n.",m:"出售，销售",f:"复数 sales；短语 on sale 廉价出售",e:"The shoes are on sale, so they are much cheaper now.",t:"这些鞋正在降价促销，现在便宜多了。"},
+{w:"website",p:"ˈwebsaɪt",pos:"n.",m:"网站",f:"复数 websites",e:"You can compare prices on the shopping website.",t:"你可以在购物网站上比较价格。"},
+{w:"worth",p:"wɜːθ",pos:"adj.",m:"值……钱",f:"短语 be worth doing 值得做",e:"The old comb is worth only a few cents, but I love it.",t:"这把旧梳子只值几美分，但我很喜欢它。"},
+{w:"dollar",p:"ˈdɒlə(r)",pos:"n.",m:"美元",f:"复数 dollars",e:"The book costs about ten dollars.",t:"这本书大约十美元。"},
+{w:"cent",p:"sent",pos:"n.",m:"分，美分",f:"复数 cents",e:"The stamp costs fifty cents.",t:"这张邮票五十美分。"},
+{w:"penny",p:"ˈpeni",pos:"n.",m:"便士",f:"复数 pennies/pence",e:"The old penny is my grandpa's treasure.",t:"那枚旧便士是爷爷的宝贝。"},
+{w:"couple",p:"ˈkʌpl",pos:"n.",m:"一对夫妇；一对",f:"复数 couples；短语 a couple of 几个",e:"The old couple saves money for their grandchildren.",t:"这对老夫妇为孙辈们存钱。"},
+{w:"flat",p:"flæt",pos:"n./adj.",m:"公寓房；平的",f:"复数 flats；美式常用 apartment",e:"They live in a small flat near the bank.",t:"他们住在银行附近的一套小公寓里。"},
+{w:"treasure",p:"ˈtreʒə(r)",pos:"n.",m:"珍宝，珍品",f:"复数 treasures；派生 treasury n. 宝库",e:"The moneybox is a treasure from my childhood.",t:"这个储钱罐是我童年的珍宝。"},
+{w:"make sense",p:"",pos:"phr.",m:"有道理",f:"主语常为物；sense 名词“道理”",e:"Does it make sense to save money for something you really need?",t:"为真正需要的东西存钱，这有道理吗？"},
+{w:"deal with",p:"",pos:"phr.",m:"处理",f:"近义 do with；后接名词或代词",e:"We should learn how to deal with our pocket money.",t:"我们应该学会如何打理零花钱。"},
+{w:"make ends meet",p:"",pos:"phr.",m:"勉强维持",f:"ends 指收入和支出两端",e:"Some families find it hard to make ends meet.",t:"有些家庭发现收支平衡很难。"},
+{w:"on sale",p:"",pos:"phr.",m:"廉价出售",f:"区别 for sale 待售",e:"The winter coats are on sale at the supermarket.",t:"超市的冬装正在降价销售。"},
+{w:"Christmas Eve",p:"",pos:"phr.",m:"平安夜",f:"专有名词，首字母大写",e:"On Christmas Eve, the shop stays open late.",t:"平安夜那天，这家店营业到很晚。"},
+{w:"a couple of",p:"",pos:"phr.",m:"几个",f:"couple 名词“一对”",e:"I bought a couple of books with my savings.",t:"我用积蓄买了几本书。"},
+{w:"save up",p:"",pos:"phr.",m:"存钱",f:"up 为副词，代词放中间：save it up",e:"You should save up for a new laptop.",t:"你应该攒钱买一台新笔记本电脑。"},
+{w:"pocket money",p:"",pos:"phr.",m:"零花钱",f:"美式常用 allowance",e:"British children often get pocket money from their parents.",t:"英国孩子经常从父母那里得到零花钱。"}
+]},
+{id:"u3",title:"Unit 3 Past passing by",words:[
+{w:"mirror",p:"ˈmɪrə(r)",pos:"v./n.",m:"反映；镜子",f:"复数 mirrors；派生 mirror image 镜像",e:"Old objects mirror the life of people in the past.",t:"老物件反映了过去人们的生活。"},
+{w:"guest",p:"ɡest",pos:"n.",m:"嘉宾，宾客",f:"复数 guests",e:"The museum invited a famous archaeologist as its guest.",t:"博物馆邀请了一位著名考古学家作为嘉宾。"},
+{w:"remains",p:"rɪˈmeɪnz",pos:"n.",m:"遗迹；剩余物",f:"常用复数；remain v. 剩余",e:"The remains of the ancient city attract many visitors.",t:"古城遗迹吸引了许多游客。"},
+{w:"lie",p:"laɪ",pos:"v.",m:"位于；躺；说谎",f:"位于/躺：过去式 lay，过去分词 lain；说谎：lied；现在分词 lying",e:"The ancient town lies in the northwest of China.",t:"这座古镇位于中国西北部。"},
+{w:"northwest",p:"ˌnɔːθˈwest",pos:"n.",m:"西北方",f:"派生 north 北；west 西；形容词 northwestern",e:"The Silk Road starts from the northwest of China.",t:"丝绸之路从中国西北部出发。"},
+{w:"archaeologist",p:"ˌɑːkiˈɒlədʒɪst",pos:"n.",m:"考古学家",f:"复数 archaeologists；派生 archaeology n. 考古学",e:"The archaeologist found valuable things in the ancient city.",t:"考古学家在古城里发现了有价值的东西。"},
+{w:"giant",p:"ˈdʒaɪənt",pos:"n./adj.",m:"巨人；巨大的",f:"复数 giants",e:"The giant Buddha statue was built more than 1,000 years ago.",t:"这尊巨大的佛像建于一千多年前。"},
+{w:"centre",p:"ˈsentə(r)",pos:"n.",m:"中心",f:"复数 centres；美式 center；派生 central adj. 中心的",e:"The city was once a centre of trade on the Silk Road.",t:"这座城市曾是丝绸之路上的贸易中心。"},
+{w:"period",p:"ˈpɪəriəd",pos:"n.",m:"时期；阶段",f:"复数 periods",e:"The museum shows objects from different periods of history.",t:"博物馆展出了不同历史时期的物品。"},
+{w:"form",p:"fɔːm",pos:"v./n.",m:"形成；形式",f:"三单 forms；过去式 formed；短语 in the form of 以……的形式",e:"The old road formed a bridge between the East and the West.",t:"这条古老的道路在东西方之间架起了一座桥梁。"},
+{w:"valuable",p:"ˈvæljuəbl",pos:"adj.",m:"宝贵的，有价值的",f:"派生 value n. 价值",e:"The scientists found many valuable things in the remains.",t:"科学家们在遗迹中发现了很多有价值的物品。"},
+{w:"smoothly",p:"ˈsmuːðli",pos:"adv.",m:"顺利地",f:"派生 smooth adj. 顺利的；光滑的",e:"The talk about the old cartoon went smoothly.",t:"关于老动画片的讲座进行得很顺利。"},
+{w:"luck",p:"lʌk",pos:"n.",m:"好运，幸运",f:"不可数名词；派生 lucky adj. 幸运的",e:"Good luck with your speech about the Silk Road!",t:"祝你关于丝绸之路的演讲好运！"},
+{w:"cartoon",p:"kɑːˈtuːn",pos:"n.",m:"卡通片",f:"复数 cartoons",e:"The first Chinese cartoon with sound was made in 1935.",t:"中国第一部有声动画片制作于1935年。"},
+{w:"silk",p:"sɪlk",pos:"n.",m:"丝绸",f:"不可数名词；the Silk Road 丝绸之路",e:"The silk from China was sold all over the world.",t:"中国的丝绸销往世界各地。"},
+{w:"matchbox",p:"ˈmætʃbɒks",pos:"n.",m:"火柴盒",f:"复数 matchboxes",e:"Grandpa keeps his old matchboxes as a collection.",t:"爷爷把旧火柴盒当作收藏品保存着。"},
+{w:"weight",p:"weɪt",pos:"n.",m:"重量",f:"派生 weigh v. 称重；短语 put on weight 增重",e:"The weight of the stone lion is more than two tons.",t:"这座石狮子的重量超过两吨。"},
+{w:"ton",p:"tʌn",pos:"n.",m:"吨",f:"复数 tons",e:"The giant stone weighs about two tons.",t:"这块巨石重约两吨。"},
+{w:"mystery",p:"ˈmɪstəri",pos:"n.",m:"神秘事物，谜",f:"复数 mysteries；派生 mysterious adj. 神秘的",e:"The ancient city is full of mystery for scientists.",t:"这座古城对科学家们来说充满谜团。"},
+{w:"coast",p:"kəʊst",pos:"n.",m:"海岸，海滨",f:"复数 coasts；派生 coastal adj. 沿海的",e:"The city on the east coast has a long history.",t:"这座东部沿海城市历史悠久。"},
+{w:"pretty",p:"ˈprɪti",pos:"adj./adv.",m:"漂亮的；相当",f:"比较级 prettier；作副词时修饰形容词",e:"The silk scarf looks pretty on you.",t:"你戴这条丝巾很好看。"},
+{w:"hit",p:"hɪt",pos:"n./v.",m:"风行一时的事物；击打",f:"三单 hits；过去式 hit；过去分词 hit",e:"The cartoon became a big hit all over the country.",t:"这部动画片风靡全国。"},
+{w:"besides",p:"bɪˈsaɪdz",pos:"prep.",m:"除……之外（还）",f:"区别 except（除……之外，不包括）",e:"Besides silk, the traders sold tea and paper on the Silk Road.",t:"除了丝绸，商人们还在丝绸之路上销售茶叶和纸张。"},
+{w:"creativity",p:"ˌkriːeɪˈtɪvəti",pos:"n.",m:"创造力",f:"不可数名词；派生 creative adj. 有创造力的",e:"The old artists showed great creativity in their work.",t:"古代工匠在作品中展现了非凡的创造力。"},
+{w:"technology",p:"tekˈnɒlədʒi",pos:"n.",m:"科技",f:"复数 technologies；派生 technological adj. 技术的",e:"New technology helps bring old cartoons back to life.",t:"新科技让老动画片重新焕发生机。"},
+{w:"multimedia",p:"ˌmʌltiˈmiːdiə",pos:"adj.",m:"多媒体的",f:"multi- 前缀“多”；media 名词“媒体”",e:"The multimedia show makes the old story come to life.",t:"多媒体展示让古老的故事鲜活起来。"},
+{w:"noisy",p:"ˈnɔɪzi",pos:"adj.",m:"嘈杂的",f:"比较级 noisier；派生 noise n. 噪音",e:"The streets were noisy with traders from different countries.",t:"街上满是来自不同国家的商人，熙熙攘攘。"},
+{w:"collection",p:"kəˈlekʃn",pos:"n.",m:"收藏品",f:"复数 collections；派生 collect v. 收集",e:"The museum has a large collection of ancient coins.",t:"这家博物馆收藏了大量古钱币。"},
+{w:"fever",p:"ˈfiːvə(r)",pos:"n.",m:"狂热；发烧",f:"不可数/复数 fevers；短语 have a fever 发烧",e:"The whole country was in a fever about the new cartoon.",t:"全国掀起了一股新动画片的热潮。"},
+{w:"pride",p:"praɪd",pos:"n.",m:"自豪，骄傲",f:"不可数名词；派生 proud adj. 自豪的；短语 take pride in",e:"We take great pride in Chinese cartoons.",t:"我们为中国动画片感到无比自豪。"},
+{w:"design",p:"dɪˈzaɪn",pos:"n./v.",m:"设计；装饰图案",f:"复数 designs；三单 designs；过去式 designed",e:"The design of the museum shows the beauty of old Chinese art.",t:"博物馆的设计展现了中国古代艺术之美。"},
+{w:"bat",p:"bæt",pos:"n.",m:"蝙蝠；球棒",f:"复数 bats",e:"The bats fly out of the old cave at night.",t:"蝙蝠夜里从古老的洞穴中飞出。"},
+{w:"scarf",p:"skɑːf",pos:"n.",m:"围巾；披肩",f:"复数 scarves/scarfs",e:"Mum bought a silk scarf as a birthday gift.",t:"妈妈买了一条丝巾作为生日礼物。"},
+{w:"fridge",p:"frɪdʒ",pos:"n.",m:"冰箱",f:"复数 fridges；全写 refrigerator",e:"The fridge magnet of the Great Wall is my favourite.",t:"那个长城冰箱贴是我的最爱。"},
+{w:"the fruit of",p:"",pos:"phr.",m:"……的成果",f:"fruit 此处喻指“成果”",e:"These great works are the fruit of the artists' hard work.",t:"这些伟大的作品是艺术家们辛勤劳动的成果。"},
+{w:"bring out",p:"",pos:"phr.",m:"使显现",f:"代词放中间：bring it out",e:"The new film tries to bring out the beauty of the old city.",t:"新电影力图展现老城市的美丽。"},
+{w:"come to life",p:"",pos:"phr.",m:"变得生动",f:"life 复数 lives，此处用单数",e:"The old story seems to come to life in the cartoon.",t:"这个古老的故事在动画片中仿佛活了过来。"},
+{w:"take pride in",p:"",pos:"phr.",m:"对……自豪",f:"同义 be proud of",e:"We take pride in our long history.",t:"我们为悠久的历史感到自豪。"},
+{w:"fridge magnet",p:"",pos:"phr.",m:"冰箱磁贴",f:"magnet n. 磁铁",e:"I collect a fridge magnet from every city I visit.",t:"我每到一座城市都会收集一个冰箱贴。"},
+{w:"home and abroad",p:"",pos:"phr.",m:"国内外",f:"abroad adv. 在国外",e:"Chinese cartoons are popular both at home and abroad.",t:"中国动画片在国内外都很受欢迎。"},
+{w:"be made of",p:"",pos:"phr.",m:"由……制成",f:"看出原材料；be made from 看不出原材料",e:"A simple kite can be made of paper and bamboo.",t:"简单的风筝可以用纸和竹子做成。"}
+]},
+{id:"u4",title:"Unit 4 Heroes",words:[
+{w:"socialist",p:"ˈsəʊʃəlɪst",pos:"adj.",m:"社会主义的",f:"派生 socialism n. 社会主义；society n. 社会",e:"His grandfather was a brave socialist fighter in the war.",t:"他的爷爷曾是战争中一位勇敢的社会主义战士。"},
+{w:"great-aunt",p:"ˌɡreɪtˈɑːnt",pos:"n.",m:"姑婆；姨婆",f:"复数 great-aunts",e:"My great-aunt often tells me stories about the war.",t:"我的姑婆常给我讲战争年代的故事。"},
+{w:"fighter",p:"ˈfaɪtə(r)",pos:"n.",m:"斗士，奋斗者",f:"复数 fighters；派生 fight v. 战斗",e:"His grandfather was a brave fighter in the war.",t:"他的爷爷是战争中一位勇敢的战士。"},
+{w:"later",p:"ˈleɪtə(r)",pos:"adv.",m:"之后；后来",f:"短语 later on 后来；sooner or later 迟早",e:"He joined the army, and later became a famous doctor.",t:"他参军了，后来成为一位著名的医生。"},
+{w:"footstep",p:"ˈfʊtstep",pos:"n.",m:"足迹；脚步",f:"复数 footsteps；短语 follow in one's footsteps 效仿某人",e:"She decided to follow her father's footsteps and become a doctor.",t:"她决定追随父亲的脚步，成为一名医生。"},
+{w:"realise",p:"ˈrɪəlaɪz",pos:"v.",m:"明白；认识到",f:"三单 realises；过去式 realised；美式写法 realize",e:"Later I realised how much Dad had done for the family.",t:"后来我才明白爸爸为这个家付出了多少。"},
+{w:"gentle",p:"ˈdʒentl",pos:"adj.",m:"温和的，温柔的",f:"比较级 gentler；派生 gently adv. 温和地",e:"The gentle doctor treated every soldier with care.",t:"这位温和的医生悉心照料每一位伤员。"},
+{w:"pity",p:"ˈpɪti",pos:"n.",m:"可惜，遗憾",f:"复数 pities；短语 what a pity 真可惜",e:"It's a pity that the hero passed away so young.",t:"真遗憾，那位英雄这么年轻就去世了。"},
+{w:"war",p:"wɔː(r)",pos:"n.",m:"战争",f:"复数 wars；反义 peace 和平",e:"His grandpa fought bravely in the war.",t:"他的爷爷在战争中英勇作战。"},
+{w:"battle",p:"ˈbætl",pos:"n.",m:"战斗，战役",f:"复数 battles",e:"The soldiers won the battle after a whole night's fight.",t:"经过一整夜的战斗，战士们赢得了这场战役。"},
+{w:"shock",p:"ʃɒk",pos:"n./v.",m:"令人震惊的事；使震惊",f:"三单 shocks；过去式 shocked；派生 shocking adj. 令人震惊的",e:"The news of his death shocked the whole country.",t:"他牺牲的消息震惊了全国。"},
+{w:"survivor",p:"səˈvaɪvə(r)",pos:"n.",m:"生还者，幸存者",f:"复数 survivors；派生 survive v. 幸存",e:"The survivor of the battle told us the story of the hero.",t:"那场战役的幸存者给我们讲了英雄的故事。"},
+{w:"temperature",p:"ˈtemprətʃə(r)",pos:"n.",m:"温度，气温",f:"短语 take one's temperature 量体温",e:"The nurse took the wounded soldier's temperature every hour.",t:"护士每小时给伤员量一次体温。"},
+{w:"lose",p:"luːz",pos:"v.",m:"丧失，失去；丢失",f:"三单 loses；过去式 lost；过去分词 lost；现在分词 losing",e:"Soldiers may lose their lives in the war.",t:"战士们可能在战争中失去生命。"},
+{w:"post",p:"pəʊst",pos:"n./v.",m:"岗位；邮政；邮寄",f:"复数 posts；短语 post office 邮局",e:"The doctor worked at his post for three days without sleep.",t:"这位医生在岗位上连续工作了三天没有合眼。"},
+{w:"deeply",p:"ˈdiːpli",pos:"adv.",m:"非常，很深地",f:"派生 deep adj. 深的",e:"We were deeply moved by the hero's story.",t:"我们被英雄的故事深深打动。"},
+{w:"presenter",p:"prɪˈzentə(r)",pos:"n.",m:"主持人，主播",f:"复数 presenters；派生 present v. 主持；呈现",e:"The TV presenter talked about heroes in the war.",t:"电视节目主持人讲述了战争中的英雄。"},
+{w:"recommend",p:"ˌrekəˈmend",pos:"v.",m:"推荐",f:"三单 recommends；过去式 recommended",e:"The teacher recommended a book about war heroes to us.",t:"老师向我们推荐了一本关于战争英雄的书。"},
+{w:"co-pilot",p:"ˈkəʊˌpaɪlət",pos:"n.",m:"副驾驶员",f:"复数 co-pilots；co- 前缀“副的”",e:"The co-pilot helped the captain land the plane safely.",t:"副驾驶员帮助机长使飞机安全着陆。"},
+{w:"engine",p:"ˈendʒɪn",pos:"n.",m:"发动机，引擎",f:"复数 engines；派生 engineer n. 工程师",e:"Something was wrong with the plane's engine.",t:"飞机的发动机出了故障。"},
+{w:"state",p:"steɪt",pos:"v./n.",m:"陈述；状态；国家",f:"三单 states；过去式 stated",e:"The pilot calmly stated that he would land the plane safely.",t:"飞行员冷静地表示他能让飞机安全降落。"},
+{w:"dreamer",p:"ˈdriːmə(r)",pos:"n.",m:"梦想家",f:"复数 dreamers；派生 dream v./n. 梦想",e:"The young dreamer worked hard to become a pilot.",t:"这位年轻的追梦人刻苦努力，想成为一名飞行员。"},
+{w:"pick",p:"pɪk",pos:"v.",m:"采，摘；挑选",f:"三单 picks；过去式 picked；短语 pick up 捡起；接（电话）",e:"The scientist picked the strongest seedlings for the experiment.",t:"科学家挑选出最壮实的秧苗用于实验。"},
+{w:"countless",p:"ˈkaʊntləs",pos:"adj.",m:"无数的",f:"-less 后缀“无……的”；派生 count v. 数",e:"Yuan Longping spent countless hours in the rice fields.",t:"袁隆平在稻田里度过了无数个日夜。"},
+{w:"experiment",p:"ɪkˈsperɪmənt",pos:"n.",m:"实验",f:"复数 experiments；短语 do an experiment 做实验",e:"The experiment helped the scientists grow stronger rice.",t:"这项实验帮助科学家培育出更强壮的水稻。"},
+{w:"type",p:"taɪp",pos:"n./v.",m:"类型；打字",f:"复数 types；三单 types；过去式 typed",e:"This type of rice grows well in poor soil.",t:"这种水稻在贫瘠的土壤里也长得很好。"},
+{w:"poor",p:"pʊə(r)",pos:"adj.",m:"差的；贫穷的",f:"比较级 poorer；反义 rich 富有的",e:"In the past, many poor families didn't have enough food.",t:"过去，许多贫困家庭吃不饱饭。"},
+{w:"soil",p:"sɔɪl",pos:"n.",m:"土壤，泥土",f:"不可数名词",e:"The rice grows well in the rich soil of the farmland.",t:"水稻在农田肥沃的土壤里长势良好。"},
+{w:"feed",p:"fiːd",pos:"v.",m:"养活；喂养",f:"三单 feeds；过去式/过去分词 fed",e:"The new type of rice can feed more people.",t:"这种新型水稻能养活更多的人。"},
+{w:"name … after",p:"",pos:"phr.",m:"以……命名",f:"英式 name after；美式 name for",e:"The school was named after the great hero.",t:"这所学校以那位伟大英雄的名字命名。"},
+{w:"leave … behind",p:"",pos:"phr.",m:"留下",f:"代词放中间：leave it behind",e:"The hero left behind a diary from the war years.",t:"这位英雄留下了一本战争年代的日记。"},
+{w:"front line",p:"",pos:"phr.",m:"前线",f:"front adj. 前面的；line n. 线；防线",e:"The doctor worked on the front line during the war.",t:"战争期间，这位医生在前线救死扶伤。"},
+{w:"scientific research",p:"",pos:"phr.",m:"科学研究",f:"scientific adj. 科学的；research n. 研究",e:"He spent his whole life on scientific research.",t:"他毕生致力于科学研究。"},
+{w:"pass away",p:"",pos:"phr.",m:"去世",f:"委婉语，= die",e:"A hero may pass away, but his spirit lives on.",t:"英雄可能会离世，但他的精神永存。"},
+{w:"give up",p:"",pos:"phr.",m:"放弃",f:"代词放中间：give it up；后接动名词",e:"He told himself never to give up, even after hundreds of failures.",t:"即使经历数百次失败，他也告诫自己永不放弃。"},
+{w:"in memory of",p:"",pos:"phr.",m:"纪念",f:"memory n. 记忆；纪念",e:"The museum was built in memory of the hero.",t:"这座博物馆是为纪念那位英雄而建的。"},
+{w:"die for",p:"",pos:"phr.",m:"为……牺牲",f:"die v. 死；过去式 died",e:"He was ready to die for his country and his people.",t:"他时刻准备着为国家和人民献出生命。"}
+]},
+{id:"u5",title:"Unit 5 A fine balance",words:[
+{w:"farmland",p:"ˈfɑːmlænd",pos:"n.",m:"农田，耕地",f:"不可数名词；farm n. 农场 + land n. 土地",e:"More farmland is needed to feed the growing population.",t:"养活不断增长的人口需要更多的农田。"},
+{w:"human",p:"ˈhjuːmən",pos:"adj./n.",m:"人类的；人类",f:"复数 humans；human being 人类",e:"Human activities have changed the natural environment.",t:"人类活动改变了自然环境。"},
+{w:"drop",p:"drɒp",pos:"v./n.",m:"降低；掉落；滴",f:"三单 drops；过去式 dropped；现在分词 dropping",e:"The temperature will drop below zero tonight.",t:"今夜气温将降至零度以下。"},
+{w:"tourist",p:"ˈtʊərɪst",pos:"n.",m:"游客",f:"复数 tourists；派生 tour n./v. 旅行",e:"Millions of tourists visit the lake every year.",t:"每年有数百万游客参观这片湖泊。"},
+{w:"benefit",p:"ˈbenɪfɪt",pos:"v./n.",m:"受益；好处",f:"三单 benefits；过去式 benefited；短语 benefit from 从……中受益",e:"Both people and animals benefit from the clean river.",t:"人类和动物都从这条清澈的河流中受益。"},
+{w:"wonder",p:"ˈwʌndə(r)",pos:"n./v.",m:"奇迹；想知道",f:"复数 wonders；三单 wonders；派生 wonderful adj. 绝妙的",e:"The Great Wall is one of the wonders of the world.",t:"长城是世界奇迹之一。"},
+{w:"admire",p:"ədˈmaɪə(r)",pos:"v.",m:"欣赏，观赏；钦佩",f:"三单 admires；过去式 admired",e:"Visitors admire the beautiful view of the lake.",t:"游客们欣赏着湖光山色。"},
+{w:"throughout",p:"θruːˈaʊt",pos:"prep.",m:"遍及；在整个期间",f:"= through + out",e:"The park is busy with tourists throughout the year.",t:"这座公园全年游客不断。"},
+{w:"mark",p:"mɑːk",pos:"n./v.",m:"痕迹；标记",f:"复数 marks；三单 marks；过去式 marked",e:"The old tree still bears the marks of the great flood.",t:"这棵老树上还留着那场大洪水的痕迹。"},
+{w:"rapid",p:"ˈræpɪd",pos:"adj.",m:"快速的，迅速的",f:"派生 rapidly adv. 迅速地",e:"The rapid growth of cities has harmed the environment.",t:"城市的快速扩张损害了环境。"},
+{w:"society",p:"səˈsaɪəti",pos:"n.",m:"社会",f:"复数 societies；派生 social adj. 社会的",e:"Everyone in society should help protect nature.",t:"社会中的每个人都应帮助保护自然。"},
+{w:"cancel",p:"ˈkænsl",pos:"v.",m:"取消",f:"三单 cancels；过去式 cancelled；美式 canceled",e:"The trip was cancelled because of the heavy rain.",t:"因为大雨，旅行被取消了。"},
+{w:"permit",p:"pəˈmɪt",pos:"v./n.",m:"允许；许可证",f:"三单 permits；过去式 permitted；名词重音在前 ˈpɜːmɪt",e:"Smoking is not permitted in the park.",t:"公园里禁止吸烟。"},
+{w:"affect",p:"əˈfekt",pos:"v.",m:"影响",f:"三单 affects；过去式 affected；名词形式 effect",e:"Climate change affects the lives of many animals.",t:"气候变化影响了许多动物的生活。"},
+{w:"organisation",p:"ˌɔːɡənaɪˈzeɪʃn",pos:"n.",m:"组织，团体",f:"复数 organisations；派生 organise v. 组织；美式 organization",e:"An environmental organisation is cleaning up the beach.",t:"一家环保组织正在清理海滩。"},
+{w:"harm",p:"hɑːm",pos:"v./n.",m:"伤害；危害",f:"三单 harms；过去式 harmed；派生 harmful adj. 有害的",e:"Plastic waste harms sea animals.",t:"塑料垃圾危害海洋动物。"},
+{w:"punish",p:"ˈpʌnɪʃ",pos:"v.",m:"处罚，惩罚",f:"三单 punishes；过去式 punished；派生 punishment n. 惩罚",e:"People who drop litter will be punished with a fine.",t:"乱扔垃圾的人将被处以罚款。"},
+{w:"rubbish",p:"ˈrʌbɪʃ",pos:"n.",m:"垃圾",f:"不可数名词；a pile of rubbish 一堆垃圾",e:"Please put your rubbish in the bin.",t:"请把垃圾扔进垃圾箱。"},
+{w:"overfish",p:"ˌəʊvəˈfɪʃ",pos:"v.",m:"过度捕捞",f:"三单 overfishes；过去式 overfished；over- 前缀“过度”",e:"Some seas have been overfished for years.",t:"一些海域多年来被过度捕捞。"},
+{w:"gas",p:"ɡæs",pos:"n.",m:"气，气体；煤气",f:"复数 gases",e:"Cars produce greenhouse gases that warm the earth.",t:"汽车排放使地球变暖的温室气体。"},
+{w:"square",p:"skweə(r)",pos:"adj./n.",m:"平方的；广场",f:"短语 square kilometres 平方公里",e:"The park covers about two square kilometres.",t:"这座公园占地约两平方公里。"},
+{w:"logging",p:"ˈlɒɡɪŋ",pos:"n.",m:"伐木",f:"不可数名词；log n. 原木；v. 伐木",e:"Logging has destroyed many homes of wild animals.",t:"滥伐森林毁掉了许多野生动物的家园。"},
+{w:"microphone",p:"ˈmaɪkrəfəʊn",pos:"n.",m:"麦克风，话筒",f:"复数 microphones；简称 mic",e:"The reporter spoke into the microphone at the meeting.",t:"记者在会上对着话筒讲话。"},
+{w:"alarm",p:"əˈlɑːm",pos:"n./v.",m:"警报；使惊恐",f:"复数 alarms；三单 alarms；过去式 alarmed",e:"The alarm rings when a storm is coming.",t:"暴风雨来临时警报会响起。"},
+{w:"guard",p:"ɡɑːd",pos:"n./v.",m:"警卫；守卫",f:"复数 guards；三单 guards；过去式 guarded",e:"The guards protect the old forest from logging.",t:"护林员保护着这片古森林免遭砍伐。"},
+{w:"foreigner",p:"ˈfɒrənə(r)",pos:"n.",m:"外国人",f:"复数 foreigners；派生 foreign adj. 外国的",e:"Many foreigners come to enjoy the beautiful lake.",t:"许多外国人来欣赏这片美丽的湖泊。"},
+{w:"logo",p:"ˈləʊɡəʊ",pos:"n.",m:"标识，标志",f:"复数 logos",e:"The panda is the logo of the WWF.",t:"大熊猫是世界自然基金会的标志。"},
+{w:"endangered",p:"ɪnˈdeɪndʒəd",pos:"adj.",m:"濒危的",f:"派生 endanger v. 危及；danger n. 危险",e:"Pandas are endangered animals protected by the country.",t:"大熊猫是国家保护的濒危动物。"},
+{w:"vulnerable",p:"ˈvʌlnərəbl",pos:"adj.",m:"易受伤害的",f:"派生 vulnerability n. 易受伤（性）",e:"Small islands are vulnerable to rising sea levels.",t:"小岛易受海平面上升的影响。"},
+{w:"protection",p:"prəˈtekʃn",pos:"n.",m:"保护",f:"不可数名词；派生 protect v. 保护",e:"The law gives strong protection to wild animals.",t:"法律为野生动物提供了强有力的保护。"},
+{w:"once again",p:"",pos:"phr.",m:"再一次",f:"同义 one more time",e:"Let's try once again to solve the problem.",t:"让我们再试一次来解决这个问题。"},
+{w:"start over",p:"",pos:"phr.",m:"重新开始",f:"= start again；美式常用",e:"The villagers decided to start over on new land.",t:"村民们决定在新的土地上重新开始。"},
+{w:"get along with",p:"",pos:"phr.",m:"相处融洽",f:"同义 get on with",e:"I find it easy to get along with my classmates.",t:"我觉得和同学们相处融洽很容易。"},
+{w:"global warming",p:"",pos:"phr.",m:"全球变暖",f:"global adj. 全球的；warm v. 变暖",e:"Global warming is one of the biggest problems today.",t:"全球变暖是当今最大的问题之一。"},
+{w:"greenhouse gases",p:"",pos:"phr.",m:"温室气体",f:"greenhouse n. 温室；gas 复数 gases",e:"We should produce fewer greenhouse gases.",t:"我们应该减少温室气体的排放。"},
+{w:"solar panel",p:"",pos:"phr.",m:"太阳能电池板",f:"solar adj. 太阳的；panel n. 板",e:"The solar panels on the roof turn sunlight into electricity.",t:"屋顶上的太阳能电池板把阳光转化为电能。"},
+{w:"take action",p:"",pos:"phr.",m:"采取行动",f:"action n. 行动；take actions 采取多项行动",e:"It's time to take action to protect our planet.",t:"是时候采取行动保护我们的地球了。"},
+{w:"in danger",p:"",pos:"phr.",m:"处于危险中",f:"短语 in danger of 有……的危险；反义 out of danger",e:"Many wild animals are in danger of losing their homes.",t:"许多野生动物面临失去家园的危险。"},
+{w:"cut down",p:"",pos:"phr.",m:"砍倒",f:"代词放中间：cut it down；另有“减少”之意",e:"People cut down millions of trees every year.",t:"人们每年砍伐数百万棵树。"}
+]},
+{id:"u6",title:"Unit 6 Live green",words:[
+{w:"imagination",p:"ɪˌmædʒɪˈneɪʃn",pos:"n.",m:"想象力",f:"不可数名词；派生 imagine v. 想象",e:"With a little imagination, old things can become new treasures.",t:"只要一点想象力，旧东西就能变成新宝贝。"},
+{w:"consider",p:"kənˈsɪdə(r)",pos:"v.",m:"认为；考虑",f:"三单 considers；过去式 considered；consider doing 考虑做某事",e:"We're considering turning the old boxes into bookshelves.",t:"我们正考虑把旧箱子改成书架。"},
+{w:"material",p:"məˈtɪəriəl",pos:"n.",m:"材料",f:"复数 materials",e:"Glass and paper are common recycling materials.",t:"玻璃和纸张是常见的可回收材料。"},
+{w:"shape",p:"ʃeɪp",pos:"v./n.",m:"使成形；形状",f:"三单 shapes；过去式 shaped；短语 in good shape 状态好",e:"The artist shaped the old metal into a beautiful horse.",t:"艺术家把旧金属塑造成一匹漂亮的马。"},
+{w:"long-lasting",p:"ˌlɒŋˈlɑːstɪŋ",pos:"adj.",m:"耐用的",f:"复合形容词：long + lasting",e:"Bamboo is a long-lasting material for building.",t:"竹子是一种耐用的建筑材料。"},
+{w:"cheap",p:"tʃiːp",pos:"adj.",m:"便宜的，廉价的",f:"比较级 cheaper；反义 expensive 昂贵的",e:"Homemade gifts are cheap but full of love.",t:"自制礼物花费不多却饱含心意。"},
+{w:"environmental",p:"ɪnˌvaɪrənˈmentl",pos:"adj.",m:"环境的",f:"派生 environment n. 环境",e:"The students started an environmental project at school.",t:"学生们在学校发起了一个环保项目。"},
+{w:"toothbrush",p:"ˈtuːθbrʌʃ",pos:"n.",m:"牙刷",f:"复数 toothbrushes；tooth 复数 teeth",e:"Old toothbrushes can be used to clean shoes.",t:"旧牙刷可以用来刷鞋。"},
+{w:"glove",p:"ɡlʌv",pos:"n.",m:"手套",f:"复数 gloves；a pair of gloves 一双手套",e:"She made the old gloves into toy puppets.",t:"她把旧手套做成了玩具手偶。"},
+{w:"former",p:"ˈfɔːmə(r)",pos:"adj.",m:"以前的，从前的",f:"the former 前者；the latter 后者",e:"The former factory is now a beautiful park.",t:"从前的工厂如今成了一座美丽的公园。"},
+{w:"wing",p:"wɪŋ",pos:"n.",m:"翅膀，翼",f:"复数 wings",e:"The bird hurt its wing and could not fly.",t:"那只鸟伤了翅膀，飞不起来了。"},
+{w:"tie",p:"taɪ",pos:"v./n.",m:"系，扎；领带",f:"三单 ties；过去式 tied；现在分词 tying",e:"He tied the old newspapers into a bundle for recycling.",t:"他把旧报纸捆成一捆准备回收。"},
+{w:"stuck",p:"stʌk",pos:"adj.",m:"卡住的；被困住的",f:"get stuck 被卡住；stick 的过去式也是 stuck",e:"The little fox was stuck in the fence, and we helped it out.",t:"小狐狸被栅栏卡住了，我们帮它脱了困。"},
+{w:"bin",p:"bɪn",pos:"n.",m:"垃圾箱，垃圾桶",f:"复数 bins；短语 recycling bin 回收箱",e:"Please put the bottles into the recycling bin.",t:"请把瓶子放进回收箱。"},
+{w:"average",p:"ˈævərɪdʒ",pos:"n./adj.",m:"平均数；平均的",f:"短语 on average 平均来看",e:"On average, each student uses five notebooks a year.",t:"平均每个学生一年用五个练习本。"},
+{w:"gram",p:"ɡræm",pos:"n.",m:"克",f:"复数 grams；千克 kilogram",e:"The tiny plant weighs only a few grams.",t:"这株小小的植物只有几克重。"},
+{w:"tiny",p:"ˈtaɪni",pos:"adj.",m:"极微小的",f:"比较级 tinier；反义 huge 巨大的",e:"Even a tiny action can help protect the earth.",t:"哪怕微小的行动也能帮助保护地球。"},
+{w:"trouble",p:"ˈtrʌbl",pos:"n./v.",m:"麻烦；打扰",f:"不可数名词；短语 in trouble 处于困境",e:"Sorry to trouble you, but could you help me move the box?",t:"抱歉打扰一下，能帮我搬一下这个箱子吗？"},
+{w:"wisely",p:"ˈwaɪzli",pos:"adv.",m:"明智地",f:"派生 wise adj. 明智的",e:"We should use water and electricity wisely.",t:"我们应该明智地使用水和电。"},
+{w:"highlight",p:"ˈhaɪlaɪt",pos:"v.",m:"突出，强调",f:"三单 highlights；过去式 highlighted；high + light",e:"The report highlights the problem of plastic waste.",t:"这份报告着重指出了塑料垃圾问题。"},
+{w:"pollute",p:"pəˈluːt",pos:"v.",m:"污染",f:"三单 pollutes；过去式 polluted；派生 pollution n. 污染",e:"Factories should not pollute the rivers.",t:"工厂不应污染河流。"},
+{w:"electronic",p:"ɪˌlekˈtrɒnɪk",pos:"adj.",m:"电子的",f:"派生 electronics n. 电子学；electricity n. 电",e:"Old electronic products should be recycled properly.",t:"废旧电子产品应妥善回收。"},
+{w:"truck",p:"trʌk",pos:"n.",m:"货车，卡车",f:"复数 trucks",e:"A truck comes every week to collect the rubbish.",t:"每周都有一辆卡车来收垃圾。"},
+{w:"emission",p:"ɪˈmɪʃn",pos:"n.",m:"排放物",f:"复数 emissions；派生 emit v. 排放",e:"Green travel helps cut down emissions.",t:"绿色出行有助于减少排放。"},
+{w:"upcycle",p:"ˈʌpˌsaɪkl",pos:"v.",m:"升级改造",f:"三单 upcycles；过去式 upcycled；up + cycle",e:"We upcycled old jeans into a cool schoolbag.",t:"我们把旧牛仔裤改造成了一个很酷的书包。"},
+{w:"reuse",p:"ˌriːˈjuːz",pos:"v.",m:"再使用，重复利用",f:"三单 reuses；过去式 reused；派生 reusable adj. 可重复使用的",e:"You can reuse the glass bottles as flower vases.",t:"你可以把玻璃瓶重复利用当花瓶。"},
+{w:"recycle",p:"ˌriːˈsaɪkl",pos:"v.",m:"回收利用",f:"三单 recycles；过去式 recycled；派生 recycling n. 回收利用",e:"We should recycle paper and bottles to save resources.",t:"我们应该回收利用纸张和瓶子以节约资源。"},
+{w:"fox",p:"fɒks",pos:"n.",m:"狐狸",f:"复数 foxes",e:"The fox ran quickly across the field.",t:"狐狸飞快地跑过田野。"},
+{w:"loudly",p:"ˈlaʊdli",pos:"adv.",m:"响亮地",f:"派生 loud adj. 大声的；反义 quietly 轻声地",e:"The birds sang loudly in the trees.",t:"鸟儿在树上大声鸣唱。"},
+{w:"land",p:"lænd",pos:"v./n.",m:"掉落；着陆；陆地",f:"三单 lands；过去式 landed",e:"The plane landed safely at the airport.",t:"飞机在机场安全着陆。"},
+{w:"village",p:"ˈvɪlɪdʒ",pos:"n.",m:"乡村，村庄",f:"复数 villages；派生 villager n. 村民",e:"The village has turned into a green town.",t:"这个村庄已经变成了一个绿色小镇。"},
+{w:"reporter",p:"rɪˈpɔːtə(r)",pos:"n.",m:"记者",f:"复数 reporters；派生 report v./n. 报道",e:"The reporter is making a programme about green life.",t:"这位记者正在制作一期关于绿色生活的节目。"},
+{w:"depth",p:"depθ",pos:"n.",m:"深度",f:"复数 depths；派生 deep adj. 深的",e:"The workers measured the depth of the river.",t:"工人们测量了河水的深度。"},
+{w:"suggest",p:"səˈdʒest",pos:"v.",m:"建议，提议",f:"三单 suggests；过去式 suggested；suggest doing sth. 建议做某事",e:"I suggest taking our own bags when shopping.",t:"我建议购物时自带袋子。"},
+{w:"businessman",p:"ˈbɪznəsmæn",pos:"n.",m:"商人",f:"复数 businessmen；对应 businesswoman 女商人",e:"The businessman spent his money planting trees in the desert.",t:"这位商人花钱在沙漠里植树。"},
+{w:"industrial",p:"ɪnˈdʌstriəl",pos:"adj.",m:"工业的",f:"派生 industry n. 工业",e:"The city has changed from an industrial centre to a green city.",t:"这座城市已从工业中心转变为绿色城市。"},
+{w:"litter",p:"ˈlɪtə(r)",pos:"n./v.",m:"垃圾；乱扔",f:"不可数名词；三单 litters；过去式 littered",e:"Please don't litter in the park.",t:"请不要在公园里乱扔垃圾。"},
+{w:"peace",p:"piːs",pos:"n.",m:"和平；平静",f:"不可数名词；派生 peaceful adj. 和平的；反义 war 战争",e:"We all wish for a world of peace.",t:"我们都期盼一个和平的世界。"},
+{w:"business",p:"ˈbɪznəs",pos:"n.",m:"企业，商业；生意",f:"不可数（商业）/可数（企业）；短语 on business 出差",e:"Green business is good for both people and the earth.",t:"绿色商业对人类和地球都有好处。"},
+{w:"building",p:"ˈbɪldɪŋ",pos:"n.",m:"建筑物，楼房",f:"复数 buildings；派生 build v. 建造",e:"The tall building was built with recycled materials.",t:"这座高楼是用回收材料建造的。"},
+{w:"mistake … for",p:"",pos:"phr.",m:"把……错当成",f:"mistook 是过去式；mistaken 过去分词",e:"I mistook the old glove for a toy cat.",t:"我把那只旧手套错当成玩具猫了。"},
+{w:"on average",p:"",pos:"phr.",m:"平均来看",f:"average n. 平均数",e:"On average, a family throws away 500 plastic bags a year.",t:"平均每个家庭一年扔掉500个塑料袋。"},
+{w:"break down",p:"",pos:"phr.",m:"分解；出故障",f:"代词放中间：break it down",e:"Plastic bags take hundreds of years to break down.",t:"塑料袋需要数百年才能分解。"}
+]}
+];
+
+/* ---------------------------------------------------------------------------
+ * ② 存储层：localStorage 封装（进度 / 设置 / 自定义词库）
+ * ------------------------------------------------------------------------- */
+const K={P:"wf_progress_v1",S:"wf_settings_v1",C:"wf_custom_v1"};
+const store={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast("⚠️ 本地存储失败："+e.message)}}
+};
+let P=store.get(K.P,{});                                       // 进度表：key -> {lv,next,ok,bad,mistake,last}
+let S=Object.assign({dailyNew:10,enabled:{}},store.get(K.S,{})); // 设置：每日新词数 / 模块开关
+let CUSTOM=store.get(K.C,[]);                                  // 自定义词库（"我的词库"分组）
+const saveP=()=>store.set(K.P,P);
+const saveS=()=>store.set(K.S,S);
+const saveC=()=>store.set(K.C,CUSTOM);
+
+/* ---------------------------------------------------------------------------
+ * ③ 工具函数
+ * ------------------------------------------------------------------------- */
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function addDaysStr(n){const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+let toastTimer=null;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2200)}
+/* 发音：调用系统内置 TTS（离线可用，取决于设备是否带本地语音） */
+function speak(text){try{const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=0.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+/* 数组打乱（洗牌） */
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ---------------------------------------------------------------------------
+ * ④ 词库访问与艾宾浩斯间隔复习（SRS）引擎
+ *    记忆等级 lv：0=答错重置 / 1~5 由低到高
+ *    升级后复习间隔：1级→1天，2级→2天，3级→4天，4级→7天，5级→15天
+ *    答错：等级归 0，明天再复习
+ * ------------------------------------------------------------------------- */
+const NEXT_DAYS={1:1,2:2,3:4,4:7,5:15};   // 等级 -> 间隔天数（艾宾浩斯节点）
+const MASTER_LV=4;                         // 等级≥4 视为"已掌握"
+
+function allGroups(){return BANK.concat(CUSTOM)}
+function groupEnabled(g){return S.enabled[g.id]!==false}
+/* 把词库对象规范成运行时单词对象（附加 key / gid） */
+function normWord(w,gid){
+  return {w:w.w||"",p:w.p||"",pos:w.pos||"",m:w.m||"",f:w.f||"",e:w.e||"",t:w.t||"",
+          key:String(w.w||"").trim().toLowerCase(),gid:gid};
+}
+/* 当前参与学习的全部单词（受模块开关控制） */
+function activeWords(){
+  const r=[];
+  for(const g of allGroups()){ if(!groupEnabled(g))continue;
+    for(const w of g.words) r.push(normWord(w,g.id));
+  }
+  return r;
+}
+/* 按唯一 key 查找单词 */
+function findWord(key){return activeWords().find(x=>x.key===key)}
+/* 获取某单词的进度记录（无则返回 null） */
+function rec(key){return P[key]||null}
+
+/* 核心：根据答题结果更新单词的记忆等级与下次复习时间 */
+function updateWord(word,correct){
+  const r=P[word.key]||{lv:0,next:"",ok:0,bad:0,mistake:false,last:""};
+  if(correct){
+    r.lv=Math.min(r.lv+1,5);                       // 答对：升级并按新等级拉长间隔
+    r.next=addDaysStr(NEXT_DAYS[r.lv]||1);
+    r.ok=(r.ok||0)+1;
+  }else{
+    r.lv=0;                                        // 答错：等级重置为 0，明天再见
+    r.next=addDaysStr(1);
+    r.bad=(r.bad||0)+1;
+    r.mistake=true;                                // 自动收入错题本
+  }
+  r.last=todayStr();
+  P[word.key]=r;saveP();
+  refreshHeader();
+}
+
+/* 今日计划：待复习（到期）+ 今日新词 */
+function getPlan(){
+  const t=todayStr(),pool=activeWords();
+  const due=pool.filter(w=>{const r=P[w.key];return r&&r.next&&r.next<=t});
+  const news=pool.filter(w=>!P[w.key]).slice(0,Math.max(1,S.dailyNew));
+  return {due:due,news:news,remainNew:pool.filter(w=>!P[w.key]).length};
+}
+/* 错题本列表 */
+function mistakeWords(){return activeWords().filter(w=>P[w.key]&&P[w.key].mistake)}
+
+/* ---------------------------------------------------------------------------
+ * ⑤ 练习会话（4 种模式：en2cn 英译汉 / cn2en 汉译英 / spell 拼写 / cloze 填空）
+ * ------------------------------------------------------------------------- */
+let sess=null;        // 当前会话对象
+let curMode="en2cn";  // 学习页当前选择的模式
+let mistakeMode="en2cn"; // 错题本复习模式
+
+/* 开始一次会话。type: plan(今日计划) new(只学新词) due(只复习) mistake(错题) extra(额外新词) */
+function startSession(type,mode,words){
+  let queue=words;
+  if(!queue||!queue.length){toast(type==="due"?"🎉 今日没有到期的单词，去学新词吧！":type==="new"?"🎉 新词已全部学完！":type==="mistake"?"🎉 错题本是空的，太棒了！":"🎉 暂无可学习的单词");return}
+  if(mode==="cloze") queue=queue.filter(w=>w.e);          // 填空模式需要例句
+  if(!queue.length){toast("这些单词缺少例句，暂时无法用「选词填空」练习");return}
+  sess={type:type,mode:mode,queue:shuffle(queue),idx:0,ok:0,bad:0,flipped:false,answered:false};
+  $("#studySetup").style.display="none";
+  $("#studySession").style.display="block";
+  showView("study");
+  renderCard();
+}
+/* 结束会话回到准备页 */
+function endSession(){
+  sess=null;
+  $("#studySession").style.display="none";
+  $("#studySetup").style.display="block";
+  renderSetup();renderBank();
+}
+
+/* ---------- 渲染当前卡片（根据模式分派） ---------- */
+function renderCard(){
+  const el=$("#studySession");
+  if(!sess){el.innerHTML="";return}
+  if(sess.idx>=sess.queue.length){renderDone();return}
+  const w=sess.queue[sess.idx],r=rec(w.key);
+  const lv=r?r.lv:0;
+  const prog=(sess.idx/sess.queue.length*100).toFixed(0);
+  const topHtml=
+    '<div class="session-top">'+
+      '<span class="prog">'+(sess.idx+1)+" / "+sess.queue.length+"　"+modeName(sess.mode)+(sess.type==="mistake"?" · 错题复习":"")+'</span>'+
+      '<button class="quit" id="btnQuit">✕ 退出</button>'+
+    '</div>'+
+    '<div class="pbar"><i style="width:'+prog+'%"></i></div>';
+  let body="";
+  if(sess.mode==="en2cn")      body=cardEn2Cn(w,lv);
+  else if(sess.mode==="cn2en") body=cardCn2En(w,lv);
+  else if(sess.mode==="spell") body=cardSpell(w,lv);
+  else                         body=cardCloze(w,lv);
+  el.innerHTML=topHtml+body;
+  $("#btnQuit").addEventListener("click",endSession);
+  bindCardEvents(w);
+}
+function modeName(m){return {en2cn:"英译汉",cn2en:"汉译英",spell:"拼写默写",cloze:"选词填空"}[m]||""}
+
+/* --- 模式1：英译汉闪卡（正面英文+音标，点击翻转看释义/词形/例句） --- */
+function cardEn2Cn(w,lv){
+  return '<div class="flip" id="flash">'+
+    '<div class="flip-inner">'+
+      '<div class="face front">'+
+        '<div class="word">'+esc(w.w)+'</div>'+
+        (w.p?'<div class="phon">/'+esc(w.p)+'/</div>':"")+
+        '<button class="speak-btn" id="btnSpeak">🔊 点击发音</button>'+
+        '<div class="tap-hint">👆 点击卡片翻面查看释义</div>'+
+      '</div>'+
+      '<div class="face back">'+
+        '<div class="pos-m"><span class="pos">'+esc(w.pos)+'</span>'+esc(w.m)+'</div>'+
+        (w.f?'<div class="forms">📝 '+esc(w.f)+'</div>':"")+
+        (w.e?'<div class="ex">'+hi(w.e,w.w)+'</div><div class="ext">'+esc(w.t)+"</div>":"")+
+        '<div class="level-dots">'+dots(lv)+"</div>"+
+      '</div>'+
+    '</div></div>'+
+    '<div class="judge">'+
+      '<button class="btn btn-bad" id="btnNo" disabled>😕 不认识</button>'+
+      '<button class="btn btn-good" id="btnYes" disabled>😀 认识</button>'+
+    '</div>';
+}
+/* --- 模式2：汉译英回忆（正面中文释义，翻面看英文） --- */
+function cardCn2En(w,lv){
+  return '<div class="flip" id="flash">'+
+    '<div class="flip-inner">'+
+      '<div class="face front">'+
+        '<div class="q-label">回忆对应的英文单词</div>'+
+        '<div class="pos-m"><span class="pos">'+esc(w.pos)+'</span>'+esc(w.m)+'</div>'+
+        '<div class="tap-hint">👆 想好后点击卡片核对答案</div>'+
+      '</div>'+
+      '<div class="face back">'+
+        '<div class="word">'+esc(w.w)+'</div>'+
+        (w.p?'<div class="phon">/'+esc(w.p)+'/</div>':"")+
+        (w.f?'<div class="forms">📝 '+esc(w.f)+'</div>':"")+
+        (w.e?'<div class="ex">'+hi(w.e,w.w)+'</div><div class="ext">'+esc(w.t)+"</div>":"")+
+        '<div class="level-dots">'+dots(lv)+"</div>"+
+      '</div>'+
+    '</div></div>'+
+    '<div class="judge">'+
+      '<button class="btn btn-bad" id="btnNo" disabled>😢 没想起来</button>'+
+      '<button class="btn btn-good" id="btnYes" disabled>😄 想起来了</button>'+
+    '</div>';
+}
+/* --- 模式3：拼写默写（看中文输入英文，自动判分） --- */
+function cardSpell(w,lv){
+  return '<div class="quiz-card">'+
+    '<div class="q-label">✏️ 拼写出对应的英文单词</div>'+
+    '<div class="q-meaning"><span class="q-pos">'+esc(w.pos)+'</span>'+esc(w.m)+'</div>'+
+    '<div class="hint-text" id="spellHintText"></div>'+
+    '<button class="hint-btn" id="btnSpellHint">💡 看提示（音标和首字母）</button>'+
+    '<input id="spellInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="输入英文后回车">'+
+    '<div class="feedback" id="spellFeedback"></div>'+
+  '</div>'+
+  '<button class="btn btn-primary btn-block" id="btnSpellSubmit">提交答案</button>'+
+  '<button class="btn btn-ghost btn-block" id="btnSpellNext" style="display:none;margin-top:10px">下一题 →</button>';
+}
+/* --- 模式4：选词填空（例句挖空 + 四选一；短语无法挖空时降级为释义选词） --- */
+function cardCloze(w,lv){
+  const opts=buildOptions(w);          // 生成 4 个选项（含答案）
+  const blanked=clozeSentence(w);      // 例句挖空结果（可能为 null）
+  let btns="";
+  opts.forEach((o,i)=>{btns+='<button data-opt="'+esc(o)+'">'+esc(o)+"</button>"});
+  // 挖空成功 → 展示挖空例句；失败（含省略号的短语等）→ 展示释义作为题干
+  const qHtml=blanked!==null
+    ?'<div class="cloze-sent">'+blanked+'</div>'+(w.t?'<div class="cloze-trans">'+esc(w.t)+"</div>":"")
+    :'<div class="q-meaning" style="margin-top:6px">选择正确的单词/短语：<span class="q-pos">'+esc(w.pos)+'</span>'+esc(w.m)+'</div>';
+  return '<div class="quiz-card">'+
+    '<div class="q-label">🧩 选择正确的单词填入句子</div>'+
+    qHtml+
+    '<div class="options" id="clozeOptions">'+btns+'</div>'+
+    '<div class="feedback" id="clozeFeedback"></div>'+
+  '</div>'+
+  '<button class="btn btn-ghost btn-block" id="btnClozeNext" style="display:none;margin-top:10px">下一题 →</button>';
+}
+/* 等级圆点 */
+function dots(lv){let s="";for(let i=0;i<5;i++)s+='<i class="'+(i<lv?"on":"")+'"></i>';return s}
+/* 例句中高亮目标单词（尝试原形及常见变形） */
+function hi(sentence,word){
+  const cands=inflections(word);
+  for(const c of cands){
+    const re=new RegExp("\\b"+c.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i");
+    const m=sentence.match(re);
+    if(m){return esc(sentence).replace(new RegExp("\\b"+c.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"<b>"+m[0]+"</b>")}
+  }
+  return esc(sentence);
+}
+/* 生成单词的常见变形候选（用于例句高亮与挖空匹配） */
+function inflections(word){
+  const w=word.toLowerCase(),out=[w];
+  out.push(w+"s",w+"es",w+"ed",w+"d",w+"ing");
+  if(/e$/.test(w))out.push(w.slice(0,-1)+"ed",w.slice(0,-1)+"ing");   // like→liked/liking
+  if(/[^aeiou]y$/.test(w))out.push(w.slice(0,-1)+"ies",w.slice(0,-1)+"ied"); // study→studies/studied
+  if(/^[a-z]*[aeiou][bdglmnprt]$/.test(w))out.push(w+w[w.length-1]+"ing",w+w[w.length-1]+"ed"); // stop→stopping
+  if(/man$/.test(w))out.push(w.slice(0,-3)+"men");                    // sportsman→sportsmen
+  return out;
+}
+/* 例句挖空：把目标单词（或其变形）替换为空格；无法匹配时返回 null（如含省略号的短语） */
+function clozeSentence(w){
+  const cands=inflections(w.w);
+  for(const c of cands){
+    const re=new RegExp("\\b("+c.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")\\b","i");
+    if(re.test(w.e)){
+      const m=w.e.match(re);
+      return esc(w.e).replace(re,'<span class="blank">'+"&nbsp;".repeat(Math.min(m[1].length,10))+"</span>");
+    }
+  }
+  return null;
+}
+/* 构造选词填空的 4 个选项：优先同模块干扰词 */
+function buildOptions(w){
+  const pool=activeWords().filter(x=>x.key!==w.key&&x.e);
+  const sameGid=shuffle(pool.filter(x=>x.gid===w.gid)).slice(0,3).map(x=>x.w);
+  const others=shuffle(pool.filter(x=>x.gid!==w.gid)).map(x=>x.w);
+  const opts=sameGid;
+  while(opts.length<3&&others.length)opts.push(others.pop());
+  opts.push(w.w);
+  return shuffle(opts);
+}
+
+/* ---------- 绑定卡片交互事件 ---------- */
+function bindCardEvents(w){
+  const flip=$("#flash");
+  if(flip){
+    // 点击卡片翻转；翻面后启用判分按钮
+    flip.addEventListener("click",()=>{flip.classList.toggle("flipped");sess.flipped=!sess.flipped;
+      if(sess.flipped){const y=$("#btnYes"),n=$("#btnNo");if(y)y.disabled=false;if(n)n.disabled=false;}});
+    const sp=$("#btnSpeak");if(sp)sp.addEventListener("click",e=>{e.stopPropagation();speak(w.w)});
+  }
+  const yes=$("#btnYes"),no=$("#btnNo");
+  if(yes)yes.addEventListener("click",()=>answer(w,true));
+  if(no)no.addEventListener("click",()=>answer(w,false));
+
+  // 拼写模式
+  const input=$("#spellInput");
+  if(input){
+    input.focus();
+    $("#btnSpellHint").addEventListener("click",()=>{
+      $("#spellHintText").textContent="提示：/"+w.p+"/　首字母 "+w.w[0]+"… 共 "+w.w.replace(/\s/g,"").length+" 个字母";
+    });
+    const submit=()=>{
+      if(sess.answered)return;
+      const v=input.value.trim().toLowerCase();
+      if(!v){toast("请先输入单词～");return}
+      sess.answered=true;
+      const correct=(v===w.key);
+      const fb=$("#spellFeedback");
+      if(correct){fb.className="feedback ok";fb.innerHTML="✅ 正确！"+esc(w.w)+"　/"+esc(w.p)+"/";}
+      else{fb.className="feedback no";fb.innerHTML="❌ 正确答案：<b>"+esc(w.w)+"</b>　/"+esc(w.p)+"/";}
+      speak(w.w);
+      answer(w,correct,true);
+    };
+    $("#btnSpellSubmit").addEventListener("click",submit);
+    input.addEventListener("keydown",e=>{if(e.key==="Enter")submit()});
+    const next=$("#btnSpellNext");
+    if(next)next.addEventListener("click",()=>{sess.answered=false;sess.idx++;renderCard()});
+  }
+
+  // 选词填空模式
+  const optBox=$("#clozeOptions");
+  if(optBox){
+    optBox.addEventListener("click",e=>{
+      const btn=e.target.closest("button[data-opt]");
+      if(!btn||sess.answered)return;
+      sess.answered=true;
+      const pick=btn.dataset.opt.toLowerCase(),correct=(pick===w.key);
+      optBox.querySelectorAll("button").forEach(b=>{
+        b.disabled=true;
+        if(b.dataset.opt.toLowerCase()===w.key)b.classList.add("right");
+        else if(b===btn)b.classList.add("wrong");
+      });
+      const fb=$("#clozeFeedback");
+      if(correct){fb.className="feedback ok";fb.innerHTML="✅ 正确！";}
+      else{fb.className="feedback no";fb.innerHTML="❌ 正确答案："+esc(w.w);}
+      speak(w.w);
+      answer(w,correct,true);
+    });
+    const next=$("#btnClozeNext");
+    next.addEventListener("click",()=>{sess.answered=false;sess.idx++;renderCard()});
+  }
+}
+
+/* ---------- 提交一次作答：更新SRS、错题本，然后进入下一题 ---------- */
+function answer(w,correct,alreadyRendered){
+  updateWord(w,correct);                      // 更新艾宾浩斯进度
+  if(correct)sess.ok++;else sess.bad++;
+  // 错题复习中答对 → 自动移出错题本
+  if(sess.type==="mistake"&&correct&&P[w.key]){P[w.key].mistake=false;saveP();}
+  if(alreadyRendered){
+    // 拼写/填空模式：反馈已在页面上，显示"下一题"按钮
+    const nb=$("#btnSpellNext")||$("#btnClozeNext");
+    if(nb)nb.style.display="block";
+    const sb=$("#btnSpellSubmit");if(sb)sb.disabled=true;
+    const ip=$("#spellInput");if(ip)ip.disabled=true;
+  }else{
+    sess.flipped=false;sess.idx++;renderCard();
+  }
+}
+
+/* ---------- 会话结束页 ---------- */
+function renderDone(){
+  const plan=getPlan();
+  let extra="";
+  if(sess.type!=="mistake"&&plan.remainNew>0){
+    extra='<button class="btn btn-ghost btn-block" id="btnMore" style="margin-top:10px">📚 再学 '+Math.min(S.dailyNew,plan.remainNew)+" 个新词</button>";
+  }
+  $("#studySession").innerHTML=
+    '<div class="card-box done-face">'+
+      '<div class="big">🎉</div>'+
+      '<h3>本组练习完成！</h3>'+
+      '<div class="nums"><span><b class="g">'+sess.ok+'</b><span class="muted">答对</span></span>'+
+      '<span><b class="r">'+sess.bad+'</b><span class="muted">答错</span></span></div>'+
+      '<p class="muted">'+(sess.bad===0?"全对，太厉害了！继续保持每天复习～":"错题已收入错题本，记得及时复习哦！")+'</p>'+
+      '<button class="btn btn-primary btn-block" id="btnBackHome">返回首页</button>'+extra+
+    '</div>';
+  $("#btnBackHome").addEventListener("click",endSession);
+  const more=$("#btnMore");
+  if(more)more.addEventListener("click",()=>{
+    const p=getPlan();
+    startSession("extra",sess.mode,p.news.length?p.news:activeWords().filter(w=>!P[w.key]).slice(0,S.dailyNew));
+  });
+  renderBank();renderMistakes();
+}
+
+/* ---------------------------------------------------------------------------
+ * ⑥ 各视图渲染
+ * ------------------------------------------------------------------------- */
+/* 顶栏今日词数角标 */
+function refreshHeader(){
+  const p=getPlan();
+  $("#headerChip").textContent="今日 "+(p.news.length+p.due.length)+" 词";
+}
+/* 学习准备页 */
+function renderSetup(){
+  const p=getPlan();
+  $("#planNew").textContent=p.news.length;
+  $("#planDue").textContent=p.due.length;
+  $("#planTip").textContent=p.news.length+p.due.length===0
+    ?"🎉 今日任务已全部完成！可点击下方「只学新词」加练，或明天再来～"
+    :"先复习到期单词，再学 "+p.news.length+" 个新词，预计 "+Math.max(1,Math.ceil((p.news.length+p.due.length)/2))+" 分钟。";
+  refreshHeader();
+}
+/* 词库页 */
+function renderBank(){
+  const q=($("#bankSearch").value||"").trim().toLowerCase();
+  let html="";
+  for(const g of allGroups()){
+    const words=g.words.map(w=>normWord(w,g.id));
+    let shown=words;
+    if(q)shown=words.filter(w=>w.w.toLowerCase().includes(q)||w.m.toLowerCase().includes(q));
+    if(q&&!shown.length)continue;
+    const learned=words.filter(w=>P[w.key]).length;
+    html+='<div class="mod-item" data-gid="'+g.id+'">'+
+      '<div class="mod-head">'+
+        '<span class="mt">'+esc(g.title)+'</span>'+
+        '<span class="mc">'+learned+"/"+words.length+' 已学</span>'+
+        '<button class="mod-toggle '+(groupEnabled(g)?"on":"")+'" data-toggle="'+g.id+'">'+(groupEnabled(g)?"✓ 参与学习":"已停用")+'</button>'+
+      '</div><div class="mod-words">';
+    shown.forEach(w=>{
+      const r=rec(w.key);
+      let tag="";
+      if(r&&r.mistake)tag='<span class="tag tag-mistake">错</span>';
+      else if(r)tag='<span class="tag tag-'+r.lv+'">'+(r.lv>=MASTER_LV?"已掌握":"Lv"+r.lv)+'</span>';
+      else if(groupEnabled(g))tag='<span class="tag tag-new">新</span>';
+      html+='<div class="word-row"><span class="en">'+esc(w.w)+'</span><span class="ph">'+(w.p?"/"+esc(w.p)+"/":"")+'</span><span class="cn">'+esc(w.m)+tag+'</span></div>';
+    });
+    if(!shown.length)html+='<div class="muted" style="padding:8px 0">该模块没有匹配的单词</div>';
+    html+='</div></div>';
+  }
+  $("#bankList").innerHTML=html;
+  // 展开/收起 + 模块开关
+  $$("#bankList .mod-head").forEach(h=>h.addEventListener("click",e=>{
+    if(e.target.closest(".mod-toggle"))return;
+    h.parentElement.classList.toggle("open");
+  }));
+  $$("#bankList .mod-toggle").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation();
+    const gid=b.dataset.toggle;
+    S.enabled[gid]=!groupEnabled({id:gid});
+    saveS();renderBank();renderSetup();
+    toast(groupEnabled({id:gid})?"已加入学习计划":"已从学习计划移除");
+  }));
+}
+/* 统计仪表盘 */
+function renderStats(){
+  const pool=activeWords(),t=todayStr();
+  let ok=0,bad=0,learned=0,mastered=0,due=0,todayDone=0;
+  pool.forEach(w=>{
+    const r=P[w.key];if(!r)return;
+    learned++;ok+=r.ok||0;bad+=r.bad||0;
+    if(r.lv>=MASTER_LV)mastered++;
+    if(r.next&&r.next<=t)due++;
+    if(r.last===t)todayDone++;
+  });
+  const acc=(ok+bad)?Math.round(ok/(ok+bad)*100):0;
+  $("#statGrid").innerHTML=
+    '<div class="stat-card sc-gray"><b>'+pool.length+'</b><span>词库总词数</span></div>'+
+    '<div class="stat-card sc-blue"><b>'+learned+'</b><span>已学单词</span></div>'+
+    '<div class="stat-card sc-green"><b>'+mastered+'</b><span>已掌握（Lv≥4）</span></div>'+
+    '<div class="stat-card sc-orange"><b>'+due+'</b><span>今日待复习</span></div>'+
+    '<div class="stat-card sc-blue"><b>'+acc+'%</b><span>总正确率（'+ok+'/'+(ok+bad)+'）</span></div>'+
+    '<div class="stat-card sc-green"><b>'+todayDone+'</b><span>今天已练习</span></div>';
+  // 模块进度条
+  let bars="";
+  allGroups().forEach(g=>{
+    const total=g.words.length,done=g.words.filter(w=>{const r=P[normWord(w,g.id).key];return r&&r.lv>=MASTER_LV}).length;
+    const pct=total?Math.round(done/total*100):0;
+    bars+='<div class="mp-row"><span>'+esc(g.title)+'</span><span>'+done+"/"+total+' 掌握</span></div>'+
+          '<div class="mp-bar"><i style="width:'+pct+'%"></i></div>';
+  });
+  $("#modProg").innerHTML=bars||'<div class="muted">暂无词库</div>';
+}
+/* 错题本 */
+function renderMistakes(){
+  const ms=mistakeWords();
+  let html="";
+  ms.forEach(w=>{
+    const r=P[w.key];
+    html+='<div class="mistake-row"><span class="mi-w">'+esc(w.w)+'</span><span class="mi-m">'+esc(w.m)+'</span>'+
+          '<span class="muted" style="font-size:12px">错'+(r?r.bad:0)+'次</span>'+
+          '<button class="del" data-key="'+esc(w.key)+'" title="移出错题本">✕</button></div>';
+  });
+  $("#mistakeList").innerHTML=html||'<p class="muted" style="padding:6px 0">暂无错题，继续保持！✨</p>';
+  $("#btnClearMistakes").style.display=ms.length?"block":"none";
+  $$("#mistakeList .del").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.key;if(P[k]){P[k].mistake=false;saveP()}
+    renderMistakes();toast("已移出错题本");
+  }));
+}
+/* 设置页数据回显 */
+function renderSettings(){
+  $("#dailyNew").value=S.dailyNew;
+  const n=CUSTOM.reduce((s,g)=>s+g.words.length,0);
+  $("#customCount").textContent=n?"（共 "+n+" 词）":"（空）";
+}
+
+/* ---------------------------------------------------------------------------
+ * ⑦ 自定义导入 / 备份恢复 / 重置
+ * ------------------------------------------------------------------------- */
+/* 解析粘贴的单词文本。支持：单词|释义 / 单词|音标|释义 / 完整7字段 */
+function parseImport(text){
+  const out=[],seen=new Set();
+  text.split(/\r?\n/).forEach(line=>{
+    line=line.trim();if(!line)return;
+    const parts=line.split(/[|\t]/).map(s=>s.trim()).filter((s,i,a)=>!(s===""&&i>=a.length-1));
+    if(parts.length<2)return;
+    let w,p="",pos="",m="",f="",e="",t="";
+    if(parts.length===2){w=parts[0];m=parts[1]}
+    else if(parts.length===3){w=parts[0];p=parts[1];m=parts[2]}
+    else{w=parts[0];p=parts[1];pos=parts[2];m=parts[3];f=parts[4]||"";e=parts[5]||"";t=parts[6]||""}
+    if(!w||!m)return;
+    const key=w.toLowerCase();
+    if(seen.has(key))return;
+    seen.add(key);
+    out.push({w:w,p:p,pos:pos,m:m,f:f,e:e,t:t});
+  });
+  return out;
+}
+/* 执行导入：追加到「我的词库」分组，自动去重 */
+function doImport(){
+  const words=parseImport($("#importArea").value);
+  if(!words.length){toast("没有解析到有效单词，请检查格式（至少需要：单词|释义）");return}
+  let g=CUSTOM.find(x=>x.id==="custom");
+  if(!g){g={id:"custom",title:"📥 我的词库",words:[]};CUSTOM.push(g)}
+  const exist=new Set(g.words.map(w=>String(w.w).toLowerCase()));
+  const builtin=new Set(BANK.flatMap(m=>m.words.map(w=>w.w.toLowerCase())));
+  let added=0,skipped=0;
+  words.forEach(w=>{
+    const k=w.w.toLowerCase();
+    if(exist.has(k)||builtin.has(k)){skipped++;return}
+    exist.add(k);g.words.push(w);added++;
+  });
+  saveC();renderSettings();renderBank();renderSetup();
+  $("#importArea").value="";
+  toast("导入成功：新增 "+added+" 词"+(skipped?"，跳过重复 "+skipped+" 词":""));
+}
+/* 导出备份（JSON 文件下载） */
+function doExport(){
+  const data={app:"word-flashcards",version:1,exportedAt:new Date().toISOString(),progress:P,settings:S,custom:CUSTOM};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="单词闪卡备份_"+todayStr()+".json";
+  a.click();URL.revokeObjectURL(a.href);
+  toast("备份已导出，请妥善保存文件");
+}
+/* 导入备份 */
+function doRestore(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const d=JSON.parse(fr.result);
+      if(!d||typeof d!=="object"||!("progress"in d))throw new Error("格式不对");
+      P=d.progress||{};S=Object.assign({dailyNew:10,enabled:{}},d.settings||{});CUSTOM=d.custom||[];
+      saveP();saveS();saveC();
+      renderSetup();renderBank();renderStats();renderMistakes();renderSettings();
+      toast("✅ 备份已恢复");
+    }catch(e){toast("❌ 备份文件无效："+e.message)}
+  };
+  fr.readAsText(file);
+}
+/* 重置学习记录（二次确认） */
+function doReset(){
+  if(!confirm("确定要重置学习记录吗？所有单词的记忆等级、复习计划和错题记录都会被清空！"))return;
+  if(!confirm("再次确认：重置后无法恢复（建议先在「设置」中导出备份）。真的要重置吗？"))return;
+  P={};saveP();
+  renderSetup();renderBank();renderStats();renderMistakes();
+  toast("学习记录已重置");
+}
+
+/* ---------------------------------------------------------------------------
+ * ⑧ 视图切换 & 事件初始化 & PWA 注册
+ * ------------------------------------------------------------------------- */
+function showView(name){
+  $$("section.view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+name).classList.add("active");
+  $$("#tabbar button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
+  if(name==="stats")renderStats();
+  if(name==="mistakes")renderMistakes();
+  if(name==="settings")renderSettings();
+  if(name==="bank")renderBank();
+  window.scrollTo(0,0);
+}
+
+/* PWA 安装引导：捕获 beforeinstallprompt，设置页显示一键添加按钮 */
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("#btnInstall").style.display="inline-flex"});
+
+function init(){
+  // 底部导航
+  $$("#tabbar button").forEach(b=>b.addEventListener("click",()=>{
+    if(sess&&b.dataset.view!=="study"){toast("请先退出当前练习（右上角 ✕）");return}
+    showView(b.dataset.view);
+  }));
+  // 学习模式选择
+  $$("#modeGrid .mode-item").forEach(b=>b.addEventListener("click",()=>{
+    curMode=b.dataset.mode;
+    $$("#modeGrid .mode-item").forEach(x=>x.classList.toggle("sel",x===b));
+  }));
+  // 错题复习模式选择
+  $$("#mistakeModeGrid .mode-item").forEach(b=>b.addEventListener("click",()=>{
+    mistakeMode=b.dataset.mode;
+    $$("#mistakeModeGrid .mode-item").forEach(x=>x.classList.toggle("sel",x===b));
+  }));
+  // 开始学习按钮
+  $("#btnStartPlan").addEventListener("click",()=>{
+    const p=getPlan();
+    startSession("plan",curMode,p.due.concat(p.news));
+  });
+  $("#btnOnlyNew").addEventListener("click",()=>startSession("new",curMode,getPlan().news));
+  $("#btnOnlyDue").addEventListener("click",()=>startSession("due",curMode,getPlan().due));
+  $("#btnMistakeReview").addEventListener("click",()=>startSession("mistake",mistakeMode,mistakeWords()));
+  $("#btnClearMistakes").addEventListener("click",()=>{
+    if(!confirm("确定清空错题本吗？"))return;
+    Object.keys(P).forEach(k=>{P[k].mistake=false});
+    saveP();renderMistakes();toast("错题本已清空");
+  });
+  // 词库搜索
+  $("#bankSearch").addEventListener("input",renderBank);
+  // 设置：每日新词
+  $("#dailyNew").addEventListener("change",e=>{
+    let v=parseInt(e.target.value,10);if(isNaN(v))v=10;v=Math.min(50,Math.max(5,v));
+    S.dailyNew=v;saveS();e.target.value=v;renderSetup();toast("每日新词已设为 "+v+" 个");
+  });
+  // 设置：导入/导出/重置
+  $("#btnImport").addEventListener("click",doImport);
+  $("#btnExport").addEventListener("click",doExport);
+  $("#btnRestore").addEventListener("click",()=>$("#restoreFile").click());
+  $("#restoreFile").addEventListener("change",e=>{if(e.target.files[0])doRestore(e.target.files[0]);e.target.value=""});
+  $("#btnReset").addEventListener("click",doReset);
+  $("#btnClearCustom").addEventListener("click",()=>{
+    if(!confirm("确定清空「我的词库」中的所有自定义单词吗？"))return;
+    CUSTOM=[];saveC();renderSettings();renderBank();renderSetup();toast("自定义词库已清空");
+  });
+  // 设置：一键添加到桌面
+  $("#btnInstall").addEventListener("click",async()=>{
+    if(!deferredPrompt){toast("请通过浏览器菜单 → 添加到主屏幕");return}
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt=null;$("#btnInstall").style.display="none";
+  });
+  // 桌面端键盘快捷键：空格翻面，1=认识，2=不认识
+  document.addEventListener("keydown",e=>{
+    if(!sess||sess.answered)return;
+    const tag=document.activeElement?document.activeElement.tagName:"";
+    if(tag==="INPUT"||tag==="TEXTAREA")return;  // 避免在输入框中使用快捷键
+    if(e.key===" "&&$("#flash")){e.preventDefault();$("#flash").click()}
+    else if(e.key==="1"&&$("#btnYes")&&!$("#btnYes").disabled)$("#btnYes").click();
+    else if(e.key==="2"&&$("#btnNo")&&!$("#btnNo").disabled)$("#btnNo").click();
+  });
+  // 首屏渲染
+  renderSetup();renderBank();renderMistakes();renderSettings();
+}
+init();
+
+/* PWA：注册 Service Worker（仅在 http/https 环境下；本地直接打开文件时跳过） */
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)){
+  navigator.serviceWorker.register("sw.js").catch(()=>console.log("SW 注册失败（不影响离线打开文件使用）"));
+}
+</script>
+</body>
+</html>
