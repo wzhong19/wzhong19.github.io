@@ -146,10 +146,20 @@ section.view.active{display:block}
 .face .ex b{color:var(--primary);font-style:normal}
 .face .ext{margin-top:4px;font-size:13px;color:var(--muted)}
 .face .tap-hint{position:absolute;bottom:12px;left:0;right:0;font-size:12px;color:#b3b9cc}
+/* ---------- 发音按钮组（美音/英音） ---------- */
+.speak-btns{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
 .speak-btn{
-  margin-top:12px;border:0;background:var(--primary-light);color:var(--primary);
-  border-radius:99px;padding:7px 16px;font-size:14px;cursor:pointer;
+  border:0;background:var(--primary-light);color:var(--primary);
+  border-radius:99px;padding:8px 16px;font-size:13.5px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;
+  transition:transform .1s,background .2s;
 }
+.speak-btn:hover{background:#d6e2ff}
+.speak-btn:active{transform:scale(0.94)}
+.speak-btn.uk{background:#f0e9ff;color:#7c3aed}
+.speak-btn.uk:hover{background:#e3d8ff}
+.speak-btn.playing{background:var(--green);color:#fff;animation:pulse 0.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
 .level-dots{display:flex;gap:5px;margin-top:14px}
 .level-dots i{width:9px;height:9px;border-radius:50%;background:#dfe3ee}
 .level-dots i.on{background:var(--green)}
@@ -719,8 +729,66 @@ function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMo
 function addDaysStr(n){const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 let toastTimer=null;
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2200)}
-/* 发音：调用系统内置 TTS（离线可用，取决于设备是否带本地语音） */
-function speak(text){try{const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=0.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+/* 发音：优先调用有道词典 TTS 接口（type=2 美音 / type=1 英音），失败时 fallback 到系统 TTS
+ * 注意：不能给 <audio> 设 crossOrigin——有道接口不返回 CORS 头，
+ *       设置后浏览器会拦截音频加载导致完全无声（普通播放无需 CORS） */
+const _aud=new Audio(); _aud.preload="none";
+let _audLocked=false;                       // 防止快速连点叠加播放
+const _audioBtns=new WeakSet();             // 跟踪正在"播放动画"的按钮
+_aud.addEventListener("ended",()=>{_audLocked=false;_flashBtnsOff()});
+_aud.addEventListener("error",()=>{_audLocked=false;_flashBtnsOff()});
+function _flashBtnsOn(accent){
+  document.querySelectorAll(".speak-btn."+accent).forEach(b=>{b.classList.add("playing");_audioBtns.add(b)});
+}
+function _flashBtnsOff(){
+  _audioBtns.forEach(b=>b.classList.remove("playing"));
+}
+/* 预热本地 TTS 语音列表（Chrome 首次 getVoices() 返回空，需等 voiceschanged） */
+if("speechSynthesis" in window){
+  speechSynthesis.getVoices();
+  if(typeof speechSynthesis.onvoiceschanged!=="undefined")
+    speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+}
+function speak(text,accent){
+  accent=accent||"us";
+  if(!text)return;
+  text=String(text).trim();
+  /* 多词短语/含空格 → 有道对非单词支持差，直接本地 TTS */
+  if(/\s/.test(text)){localTTS(text,accent);return}
+  /* 美音 type=2；英音 type=1 */
+  const url="https://dict.youdao.com/dictvoice?type="+(accent==="uk"?"1":"2")+"&audio="+encodeURIComponent(text);
+  if(_audLocked){try{_aud.pause()}catch(e){}}
+  _audLocked=true;
+  _aud.src=url;
+  _flashBtnsOn(accent);
+  const p=_aud.play();
+  if(p&&typeof p.then==="function"){
+    p.then(()=>{/* OK */}).catch(()=>{
+      _audLocked=false; _flashBtnsOff();
+      /* 失败：回退到本地 TTS；若本地也没有英语语音则给出提示 */
+      if(!localTTS(text,accent)) toast("⚠️ 在线发音加载失败，且本机无英语语音包");
+    });
+  }
+}
+/* 本地 TTS 兜底：返回 true=已提交朗读，false=本机无可用英语语音 */
+function localTTS(text,accent){
+  try{
+    if(!("speechSynthesis" in window))return false;
+    const voices=speechSynthesis.getVoices();
+    /* 找一个英语语音（优先目标口音） */
+    const v=voices.find(x=>x.lang===("en-GB")&&accent==="uk")
+         ||voices.find(x=>x.lang==="en-US"&&accent!=="uk")
+         ||voices.find(x=>/^en/i.test(x.lang||""));
+    if(!voices.length||!v)return false;
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang=accent==="uk"?"en-GB":"en-US";
+    if(v)u.voice=v;
+    u.rate=0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    return true;
+  }catch(e){return false}
+}
 /* 数组打乱（洗牌） */
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 
@@ -840,11 +908,19 @@ function cardEn2Cn(w,lv){
       '<div class="face front">'+
         '<div class="word">'+esc(w.w)+'</div>'+
         (w.p?'<div class="phon">/'+esc(w.p)+'/</div>':"")+
-        '<button class="speak-btn" id="btnSpeak">🔊 点击发音</button>'+
+        '<div class="speak-btns">'+
+          '<button class="speak-btn us" id="btnSpeakUs">🔊 美音</button>'+
+          '<button class="speak-btn uk" id="btnSpeakUk">🔈 英音</button>'+
+        '</div>'+
         '<div class="tap-hint">👆 点击卡片翻面查看释义</div>'+
       '</div>'+
       '<div class="face back">'+
-        '<div class="pos-m"><span class="pos">'+esc(w.pos)+'</span>'+esc(w.m)+'</div>'+
+        '<div class="word">'+esc(w.w)+'</div>'+
+        (w.p?'<div class="phon">/'+esc(w.p)+'/</div>':"")+
+        '<div class="speak-btns">'+
+          '<button class="speak-btn us" id="btnSpeakUs">🔊 美音</button>'+
+          '<button class="speak-btn uk" id="btnSpeakUk">🔈 英音</button>'+
+        '</div>'+
         (w.f?'<div class="forms">📝 '+esc(w.f)+'</div>':"")+
         (w.e?'<div class="ex">'+hi(w.e,w.w)+'</div><div class="ext">'+esc(w.t)+"</div>":"")+
         '<div class="level-dots">'+dots(lv)+"</div>"+
@@ -960,7 +1036,10 @@ function bindCardEvents(w){
     // 点击卡片翻转；翻面后启用判分按钮
     flip.addEventListener("click",()=>{flip.classList.toggle("flipped");sess.flipped=!sess.flipped;
       if(sess.flipped){const y=$("#btnYes"),n=$("#btnNo");if(y)y.disabled=false;if(n)n.disabled=false;}});
-    const sp=$("#btnSpeak");if(sp)sp.addEventListener("click",e=>{e.stopPropagation();speak(w.w)});
+    /* 美音 / 英音 按钮（共用同一组） */
+    const spUs=$("#btnSpeakUs"),spUk=$("#btnSpeakUk");
+    if(spUs)spUs.addEventListener("click",e=>{e.stopPropagation();speak(w.w,"us")});
+    if(spUk)spUk.addEventListener("click",e=>{e.stopPropagation();speak(w.w,"uk")});
   }
   const yes=$("#btnYes"),no=$("#btnNo");
   if(yes)yes.addEventListener("click",()=>answer(w,true));
